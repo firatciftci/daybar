@@ -84,6 +84,7 @@ private struct GeneralPane: View {
                 }
                 .onChange(of: prefs.weekStart) { store.reload() }
                 Toggle(L.compactLayout, isOn: $prefs.compact)
+                Toggle(L.showQuickAdd, isOn: $prefs.showQuickAdd)
                 Toggle(L.weekNumbers, isOn: $prefs.showWeekNumbers)
                 TimeZonePicker(selection: $prefs.secondTimeZoneID)
             }

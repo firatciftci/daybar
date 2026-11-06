@@ -150,13 +150,17 @@ private struct ResizeHandle: View {
 
 private struct HomeView: View {
     @Environment(PanelModel.self) private var model
+    @Environment(Preferences.self) private var prefs
 
     var body: some View {
         VStack(spacing: 0) {
-            InputSlot()
-                .padding(.horizontal, 12)
-                .padding(.top, 10)
-                .zIndex(3)
+            if prefs.showQuickAdd || model.input != .quickAdd {
+                InputSlot(input: model.input)
+                    .padding(.horizontal, 12)
+                    .padding(.top, 10)
+                    .transition(.opacity.combined(with: .scale(scale: 0.96, anchor: .top)))
+                    .zIndex(3)
+            }
             ZStack(alignment: .top) {
                 Group {
                     switch layout {
@@ -176,6 +180,10 @@ private struct HomeView: View {
             .frame(maxHeight: .infinity, alignment: .top)
             .zIndex(1)
         }
+        .animation(Motion.navigate, value: prefs.showQuickAdd)
+        .onChange(of: prefs.showQuickAdd) { _, shown in
+            if !shown { model.quickAddText = "" }
+        }
     }
 
     private var layout: PanelMode {
@@ -188,7 +196,12 @@ struct LowerPane<Content: View>: View {
     @Environment(PanelModel.self) private var model
 
     var body: some View {
+        let browsing = model.input == .quickAdd
         ZStack(alignment: .top) {
+            content
+                .opacity(browsing ? 1 : 0)
+                .allowsHitTesting(browsing)
+                .accessibilityHidden(!browsing)
             switch model.input {
             case .search:
                 SearchResults()
@@ -198,8 +211,7 @@ struct LowerPane<Content: View>: View {
                     .id(model.draft.id)
                     .transition(swap)
             case .quickAdd:
-                content
-                    .transition(swap)
+                EmptyView()
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
@@ -212,13 +224,13 @@ struct LowerPane<Content: View>: View {
 }
 
 private struct InputSlot: View {
-    @Environment(PanelModel.self) private var model
+    let input: InputMode
     @Namespace private var glass
 
     var body: some View {
         GlassEffectContainer(spacing: 6) {
             VStack(spacing: 6) {
-                switch model.input {
+                switch input {
                 case .quickAdd:
                     QuickAddBar(glass: glass)
                 case .search:

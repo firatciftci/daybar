@@ -156,6 +156,7 @@ enum L {
     static let saveFutureEvents = "Save for future events"
     static let close = "Close"
     static let compactLayout = "Compact layout"
+    static let showQuickAdd = "Show quick add bar"
     static func newEventOn(_ day: String) -> String { "New event on \(day)" }
     static func moreEvents(_ count: Int) -> String { "\(count) more" }
     static func turnsAge(_ age: Int) -> String { "Turns \(age)" }
