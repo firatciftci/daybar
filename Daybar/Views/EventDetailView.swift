@@ -234,8 +234,9 @@ private struct AttendeeRow: View {
 
     var body: some View {
         let email = participant.url.absoluteString.hasPrefix("mailto:") ? String(participant.url.absoluteString.dropFirst(7)) : nil
-        let card = contacts.card(forEmail: email)
-        let given = participant.name.flatMap { $0.contains("@") ? nil : $0 } ?? card?.name
+        let named = participant.name.flatMap { $0.contains("@") ? nil : $0 }
+        let card = contacts.card(for: participant, email: email, name: named)
+        let given = named ?? card?.name
         let name = given ?? email ?? participant.url.absoluteString
         Button {
             if let url = card?.url { NSWorkspace.shared.open(url) }
