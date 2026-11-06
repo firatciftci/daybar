@@ -70,7 +70,7 @@ struct GlassCircleButton: View {
 enum Motion {
     static let select = Animation.snappy(duration: 0.3)
     static let lift = Animation.snappy(duration: 0.24)
-    static let navigate = Animation.smooth(duration: 0.34)
+    static let navigate = Animation.spring(duration: 0.42, bounce: 0)
     static let content = Animation.easeInOut(duration: 0.18)
     static let fade = Animation.easeOut(duration: 0.14)
 }
@@ -395,27 +395,6 @@ final class SwipeCatcherView: NSView {
             accumulatedX = 0
             accumulatedY = 0
         }
-    }
-}
-
-struct WeatherBadge: View {
-    let forecast: DayForecast
-
-    var body: some View {
-        HStack(spacing: 5) {
-            Image(systemName: forecast.symbolName)
-                .accessibilityHidden(true)
-                .symbolRenderingMode(.multicolor)
-                .font(.system(size: 12))
-            Text(forecast.high)
-                .foregroundStyle(.primary)
-            Text(forecast.low)
-                .foregroundStyle(.tertiary)
-        }
-        .font(.system(size: 11.5, weight: .medium).monospacedDigit())
-        .fixedSize()
-        .help(forecast.condition)
-        .accessibilityElement(children: .combine)
     }
 }
 

@@ -194,7 +194,8 @@ struct MonthGrid: View {
                                     isSelected: date.isSameDay(as: model.selectedDate) && inMonth,
                                     occurrences: store.occurrences(on: date),
                                     lens: lens,
-                                    mark: model.mark(for: date)
+                                    mark: model.mark(for: date),
+                                    morphsLens: !model.selectionFollowsScroll
                                 )
                                 .accessibilityAddTraits(.isButton)
                                 .onTapGesture {
@@ -478,7 +479,8 @@ struct WeekStrip: View {
                             occurrences: store.occurrences(on: date),
                             lens: lens,
                             mark: model.mark(for: date),
-                            large: true
+                            large: true,
+                            morphsLens: !model.selectionFollowsScroll
                         )
                     }
                     .contentShape(.rect)
@@ -536,6 +538,7 @@ struct DayCell: View {
     let lens: Namespace.ID
     var mark: DayMark = .plain
     var large = false
+    var morphsLens = true
     @Environment(\.metrics) private var metrics
     @State private var hovering = false
 
@@ -570,7 +573,7 @@ struct DayCell: View {
             }
             .frame(width: diameter, height: diameter)
             .glassEffect(isSelected ? .regular.tint(today ? .red : .accentColor).interactive() : .identity, in: .circle)
-            .glassEffectID(isSelected ? "lens" : "day-\(date.timeIntervalSinceReferenceDate)", in: lens)
+            .glassEffectID(isSelected && morphsLens ? "lens" : "day-\(date.timeIntervalSinceReferenceDate)", in: lens)
             DayFingerprint(occurrences: occurrences, width: large ? 24 : 20, height: metrics.compact ? 3 : 3.5)
                 .opacity((inMonth ? 1 : 0.4) * (mark == .dim ? 0.3 : 1))
         }

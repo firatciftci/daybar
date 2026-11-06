@@ -51,6 +51,7 @@ final class PanelController: NSObject, NSWindowDelegate {
     private var isPositioning = false
     private var outsideMonitor: Any?
     private var keyMonitor: Any?
+    private var clickMonitor: Any?
     private var previousApp: NSRunningApplication?
 
     override init() {
@@ -253,6 +254,15 @@ final class PanelController: NSObject, NSWindowDelegate {
                 self.close()
             }
         }
+        clickMonitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] event in
+            let windowNumber = event.windowNumber
+            let point = event.locationInWindow
+            MainActor.assumeIsolated {
+                guard let self, windowNumber == self.panel.windowNumber else { return }
+                self.resignFieldIfClickedAway(at: point)
+            }
+            return event
+        }
         keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
             let keyCode = event.keyCode
             let windowNumber = event.windowNumber
@@ -324,6 +334,17 @@ final class PanelController: NSObject, NSWindowDelegate {
         return true
     }
 
+    private func resignFieldIfClickedAway(at point: NSPoint) {
+        guard model.route == .home, model.input != .event,
+            let editor = panel.firstResponder as? NSTextView, editor.isFieldEditor,
+            let field = editor.delegate as? NSTextField
+        else { return }
+        let frame = field.convert(field.bounds, to: nil)
+        if point.y < frame.minY - 10 || point.y > frame.maxY + 10 {
+            panel.makeFirstResponder(nil)
+        }
+    }
+
     private func quickAddField() -> NSTextField? {
         func search(_ view: NSView) -> NSTextField? {
             if let field = view as? NSTextField, field.isEditable,
@@ -355,7 +376,9 @@ final class PanelController: NSObject, NSWindowDelegate {
     private func removeMonitors() {
         if let outsideMonitor { NSEvent.removeMonitor(outsideMonitor) }
         if let keyMonitor { NSEvent.removeMonitor(keyMonitor) }
+        if let clickMonitor { NSEvent.removeMonitor(clickMonitor) }
         outsideMonitor = nil
         keyMonitor = nil
+        clickMonitor = nil
     }
 }

@@ -98,9 +98,7 @@ struct AgendaList: View {
         .onScrollTargetVisibilityChange(idType: Date.self, threshold: 0.2) { visible in
             visibleIDs = visible
             guard Date() > suppressSyncUntil, userScrolling, let first = visible.min() else { return }
-            withAnimation(Motion.select) {
-                model.syncFromList(first)
-            }
+            model.syncFromList(first)
         }
         .onChange(of: model.scrollRequest) { _, request in
             guard let request else { return }

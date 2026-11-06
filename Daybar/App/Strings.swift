@@ -30,6 +30,22 @@ enum L {
     static let settingsMenu = "Settings…"
     static let quit = "Quit Daybar"
     static let about = "About Daybar"
+    static let openWeather = "Open Weather"
+    static func weatherHighLow(_ high: String, _ low: String) -> String { "H:\(high)  L:\(low)" }
+    static let precipitation = "Precipitation"
+    static let wind = "Wind"
+    static let uvIndex = "UV index"
+    static let sunrise = "Sunrise"
+    static let sunset = "Sunset"
+    static let uvLow = "Low"
+    static let uvModerate = "Moderate"
+    static let uvHigh = "High"
+    static let uvVeryHigh = "Very high"
+    static let uvExtreme = "Extreme"
+    static func weatherBadgeLabel(_ condition: String, _ high: String, _ low: String) -> String {
+        "\(condition), high \(high), low \(low)"
+    }
+    static let weatherBadgeHint = "Shows the forecast for this day"
     static let accessTitle = "See your calendar from the menu bar"
     static let accessBody = "Daybar shows and edits the same events and reminders as the Calendar and Reminders apps."
     static let accessButton = "Allow access"

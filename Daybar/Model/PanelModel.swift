@@ -52,6 +52,7 @@ final class PanelModel {
     var input: InputMode = .quickAdd
     var draft = EventDraft.new(start: .now, end: .now, allDay: false)
     var forward = true
+    var selectionFollowsScroll = false
     var askSaveSpan = false
     var askDiscard = false
     var draftBaseline = EventDraft.new(start: .now, end: .now, allDay: false)
@@ -86,6 +87,9 @@ final class PanelModel {
 
     func select(_ date: Date, scroll: Bool = true, animated: Bool = true) {
         let day = date.startOfDay
+        if selectionFollowsScroll {
+            Task { self.setSelectionFollowsScroll(false) }
+        }
         gridDirection = day >= selectedDate ? 1 : -1
         selectedDate = day
         if !day.isSameMonth(as: displayedMonth) {
@@ -99,12 +103,27 @@ final class PanelModel {
 
     func syncFromList(_ day: Date) {
         guard !day.isSameDay(as: selectedDate) else { return }
-        gridDirection = day > selectedDate ? 1 : -1
-        selectedDate = day
-        if !day.isSameMonth(as: displayedMonth) {
-            displayedMonth = day.startOfMonth
+        guard selectionFollowsScroll else {
+            setSelectionFollowsScroll(true)
+            Task { self.syncFromList(day) }
+            return
+        }
+        withAnimation(Motion.content) {
+            gridDirection = day > selectedDate ? 1 : -1
+            selectedDate = day
+            if !day.isSameMonth(as: displayedMonth) {
+                displayedMonth = day.startOfMonth
+            }
         }
         CalendarStore.shared.ensureLoaded(around: day)
+    }
+
+    private func setSelectionFollowsScroll(_ value: Bool) {
+        var transaction = Transaction()
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+            selectionFollowsScroll = value
+        }
     }
 
     func goToToday() {

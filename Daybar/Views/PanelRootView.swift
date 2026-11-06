@@ -29,8 +29,11 @@ struct PanelRootView: View {
 
 private struct MainPanel: View {
     @Environment(PanelModel.self) private var model
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var width: CGFloat = 380
 
     var body: some View {
+        let push = NavigationPush(model: model, width: width, reduceMotion: reduceMotion)
         VStack(spacing: 0) {
             TopBar()
                 .padding(.horizontal, 12)
@@ -39,19 +42,40 @@ private struct MainPanel: View {
                 switch model.route {
                 case .home:
                     HomeView()
-                        .transition(.push(from: model.forward ? .trailing : .leading))
+                        .transition(push)
                 case .detail(let occurrence):
                     EventDetailView(occurrence: occurrence)
                         .id(occurrence.id)
-                        .transition(.push(from: model.forward ? .trailing : .leading))
+                        .transition(push)
+                        .zIndex(1)
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
             .clipped()
+            .onGeometryChange(for: CGFloat.self, of: \.size.width) { width = $0 }
         }
         .animation(Motion.navigate, value: model.route)
         .overlay(alignment: .bottom) { ResizeHandle() }
         .modifier(Confirmations())
+    }
+}
+
+private struct NavigationPush: Transition {
+    let model: PanelModel
+    let width: CGFloat
+    let reduceMotion: Bool
+
+    func body(content: Content, phase: TransitionPhase) -> some View {
+        let forward = model.forward
+        let (offset, opacity): (CGFloat, Double) =
+            switch phase {
+            case .identity: (0, 1)
+            case .willAppear: forward ? (width, 1) : (-width * 0.3, 0)
+            case .didDisappear: forward ? (-width * 0.3, 0) : (width, 1)
+            }
+        content
+            .offset(x: reduceMotion ? 0 : offset)
+            .opacity(reduceMotion ? (phase.isIdentity ? 1 : 0) : opacity)
     }
 }
 

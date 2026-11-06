@@ -5,10 +5,16 @@ import WeatherKit
 import os
 
 struct DayForecast: Hashable {
+    let date: Date
     let symbolName: String
     let high: String
     let low: String
     let condition: String
+    var precipitation: String?
+    var wind: String?
+    var uvIndex: String?
+    var sunrise: Date?
+    var sunset: Date?
 }
 
 struct WeatherCredit: Hashable {
@@ -24,14 +30,25 @@ nonisolated private struct OpenMeteoResponse: Decodable, Sendable {
         let weatherCodes: Array<Int?>
         let highs: Array<Double?>
         let lows: Array<Double?>
+        let precipitation: Array<Double?>
+        let wind: Array<Double?>
+        let uvIndex: Array<Double?>
+        let sunrise: Array<String?>
+        let sunset: Array<String?>
 
         enum CodingKeys: String, CodingKey {
             case time
             case weatherCodes = "weather_code"
             case highs = "temperature_2m_max"
             case lows = "temperature_2m_min"
+            case precipitation = "precipitation_probability_max"
+            case wind = "wind_speed_10m_max"
+            case uvIndex = "uv_index_max"
+            case sunrise
+            case sunset
         }
     }
+    let timezone: String
     let daily: Daily
 }
 
@@ -106,10 +123,16 @@ final class WeatherModel: NSObject, CLLocationManagerDelegate {
                 )
                 for day in daily {
                     map[day.date.startOfDay] = DayForecast(
+                        date: day.date.startOfDay,
                         symbolName: day.symbolName,
                         high: day.highTemperature.formatted(style),
                         low: day.lowTemperature.formatted(style),
-                        condition: day.condition.description
+                        condition: day.condition.description,
+                        precipitation: day.precipitationChance.formatted(Self.percentStyle),
+                        wind: day.wind.speed.formatted(Self.windStyle),
+                        uvIndex: Self.uvText(day.uvIndex.value),
+                        sunrise: day.sun.sunrise,
+                        sunset: day.sun.sunset
                     )
                 }
                 forecasts = map
@@ -136,14 +159,23 @@ final class WeatherModel: NSObject, CLLocationManagerDelegate {
         components?.queryItems = [
             URLQueryItem(name: "latitude", value: "\(latitude)"),
             URLQueryItem(name: "longitude", value: "\(longitude)"),
-            URLQueryItem(name: "daily", value: "weather_code,temperature_2m_max,temperature_2m_min"),
+            URLQueryItem(
+                name: "daily",
+                value:
+                    "weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,wind_speed_10m_max,uv_index_max,sunrise,sunset"
+            ),
             URLQueryItem(name: "timezone", value: "auto"),
             URLQueryItem(name: "forecast_days", value: "14"),
         ]
         guard let url = components?.url else { return }
         do {
             let (data, _) = try await URLSession.shared.data(from: url)
-            let daily = try JSONDecoder().decode(OpenMeteoResponse.self, from: data).daily
+            let response = try JSONDecoder().decode(OpenMeteoResponse.self, from: data)
+            let daily = response.daily
+            let clock = DateFormatter()
+            clock.locale = Locale(identifier: "en_US_POSIX")
+            clock.dateFormat = "yyyy-MM-dd'T'HH:mm"
+            clock.timeZone = TimeZone(identifier: response.timezone) ?? .current
             let style = Measurement<UnitTemperature>.FormatStyle(
                 width: .narrow,
                 usage: .weather,
@@ -161,10 +193,18 @@ final class WeatherModel: NSObject, CLLocationManagerDelegate {
                 else { continue }
                 let condition = Self.condition(for: code)
                 map[date.startOfDay] = DayForecast(
+                    date: date.startOfDay,
                     symbolName: condition.symbol,
                     high: Measurement(value: high, unit: UnitTemperature.celsius).formatted(style),
                     low: Measurement(value: low, unit: UnitTemperature.celsius).formatted(style),
-                    condition: condition.name
+                    condition: condition.name,
+                    precipitation: daily.precipitation[safe: index].flatMap(\.self).map { ($0 / 100).formatted(Self.percentStyle) },
+                    wind: daily.wind[safe: index].flatMap(\.self).map {
+                        Measurement(value: $0, unit: UnitSpeed.kilometersPerHour).formatted(Self.windStyle)
+                    },
+                    uvIndex: daily.uvIndex[safe: index].flatMap(\.self).map { Self.uvText(Int($0.rounded())) },
+                    sunrise: daily.sunrise[safe: index].flatMap(\.self).flatMap(clock.date(from:)),
+                    sunset: daily.sunset[safe: index].flatMap(\.self).flatMap(clock.date(from:))
                 )
             }
             forecasts = map
@@ -176,6 +216,26 @@ final class WeatherModel: NSObject, CLLocationManagerDelegate {
             lastFetch = nil
             weatherLog.error("Open-Meteo failed: \(error.localizedDescription, privacy: .public)")
         }
+    }
+
+    private static let percentStyle = FloatingPointFormatStyle<Double>.Percent().precision(.fractionLength(0))
+
+    private static let windStyle = Measurement<UnitSpeed>.FormatStyle(
+        width: .abbreviated,
+        usage: .wind,
+        numberFormatStyle: .number.precision(.fractionLength(0))
+    )
+
+    private static func uvText(_ value: Int) -> String {
+        let category =
+            switch value {
+            case ..<3: L.uvLow
+            case 3..<6: L.uvModerate
+            case 6..<8: L.uvHigh
+            case 8..<11: L.uvVeryHigh
+            default: L.uvExtreme
+            }
+        return "\(value) \(category)"
     }
 
     private static func condition(for code: Int) -> (symbol: String, name: String) {
