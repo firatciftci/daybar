@@ -1,0 +1,70 @@
+name: Daybar
+options:
+  bundleIdPrefix: com.firatciftci
+  deploymentTarget:
+    macOS: "27.0"
+  createIntermediateGroups: true
+packages:
+  KeyboardShortcuts:
+    url: https://github.com/sindresorhus/KeyboardShortcuts
+    exactVersion: "3.1.0"
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    SWIFT_DEFAULT_ACTOR_ISOLATION: MainActor
+    SWIFT_APPROACHABLE_CONCURRENCY: YES
+    SWIFT_STRICT_CONCURRENCY: complete
+    SWIFT_UPCOMING_FEATURE_EXISTENTIAL_ANY: YES
+    SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY: YES
+    SWIFT_TREAT_WARNINGS_AS_ERRORS: YES
+    GCC_TREAT_WARNINGS_AS_ERRORS: YES
+    ENABLE_USER_SCRIPT_SANDBOXING: YES
+    DEAD_CODE_STRIPPING: YES
+    DEVELOPMENT_TEAM: 55PN4MC8Q6
+    CODE_SIGN_STYLE: Automatic
+    ENABLE_HARDENED_RUNTIME: YES
+    MARKETING_VERSION: "1.0.0"
+    CURRENT_PROJECT_VERSION: "1"
+targets:
+  Daybar:
+    type: application
+    platform: macOS
+    sources:
+      - path: Daybar
+        excludes:
+          - Resources/AppIcon.icon
+          - Resources/AppIcon.icon/**
+      - path: Daybar/Resources/AppIcon.icon
+        type: file
+        buildPhase: resources
+    dependencies:
+      - package: KeyboardShortcuts
+    entitlements:
+      path: Daybar/Daybar.entitlements
+      properties:
+        com.apple.security.app-sandbox: true
+        com.apple.security.network.client: true
+        com.apple.security.personal-information.calendars: true
+        com.apple.security.personal-information.location: true
+        com.apple.security.personal-information.addressbook: true
+        com.apple.developer.weatherkit: true
+    info:
+      path: Daybar/Info.plist
+      properties:
+        CFBundleDisplayName: Daybar
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        LSUIElement: true
+        LSApplicationCategoryType: public.app-category.productivity
+        NSCalendarsFullAccessUsageDescription: Daybar shows your events in the menu bar and lets you add and edit them.
+        NSRemindersFullAccessUsageDescription: Daybar shows reminders alongside your events and lets you check them off.
+        NSContactsUsageDescription: Daybar uses your contacts to show names and photos for birthdays and event attendees.
+        NSLocationUsageDescription: Daybar uses your location to show the local weather forecast.
+        NSLocationWhenInUseUsageDescription: Daybar uses your location to show the local weather forecast.
+        NSHumanReadableCopyright: "© 2026 Firat Ciftci"
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.firatciftci.Daybar
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: ""
+        GENERATE_INFOPLIST_FILE: NO

@@ -1,0 +1,21 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended", ":configMigration", "helpers:pinGitHubActionDigests", "schedule:monthly"],
+  "timezone": "America/New_York",
+  "minimumReleaseAge": "1 day",
+  "customManagers": [
+    {
+      "description": "Swift packages pinned with exactVersion in the XcodeGen spec.",
+      "customType": "regex",
+      "managerFilePatterns": ["/^project\\.yml$/"],
+      "matchStrings": ["url: https://github\\.com/(?<depName>[^/\\s]+/[^/\\s]+?)(?:\\.git)?\\s+exactVersion: \"?(?<currentValue>[^\"\\s]+)\"?"],
+      "datasourceTemplate": "github-tags"
+    }
+  ],
+  "packageRules": [
+    {
+      "groupName": "GitHub Actions",
+      "matchManagers": ["github-actions"]
+    }
+  ]
+}

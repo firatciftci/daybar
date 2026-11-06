@@ -1,0 +1,150 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Release
+    runs-on: xcode-27
+    timeout-minutes: 60
+    environment: release
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+    env:
+      TAG: ${{ github.ref_name }}
+      TEAM_ID: 55PN4MC8Q6
+      BUNDLE_ID: com.firatciftci.Daybar
+      IDENTITY: Developer ID Application
+    steps:
+      - name: Set paths
+        run: |
+          {
+            echo "KEYCHAIN=$RUNNER_TEMP/signing.keychain-db"
+            echo "ARCHIVE=$RUNNER_TEMP/Daybar.xcarchive"
+            echo "DIST=$RUNNER_TEMP/dist"
+          } >> "$GITHUB_ENV"
+
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Install tools
+        run: brew bundle
+
+      - name: Check that the tag matches the version
+        run: |
+          version=$(sed -nE 's/^ *MARKETING_VERSION: "?([^"]+)"?$/\1/p' project.yml)
+          if [ "v$version" != "$TAG" ]; then
+            echo "::error::$TAG doesn't match MARKETING_VERSION $version in project.yml."
+            exit 1
+          fi
+
+      - name: Format, lint, build, and analyze
+        run: tools/check.sh
+
+      - name: Archive
+        run: |
+          xcodebuild archive \
+            -project Daybar.xcodeproj \
+            -scheme Daybar \
+            -configuration Release \
+            -destination generic/platform=macOS \
+            -archivePath "$ARCHIVE" \
+            CURRENT_PROJECT_VERSION="$(git rev-list --count HEAD)" \
+            CODE_SIGNING_ALLOWED=NO
+
+      - name: Import the signing certificate and profile
+        env:
+          CERTIFICATE: ${{ secrets.DEVELOPER_ID_CERTIFICATE }}
+          CERTIFICATE_PASSWORD: ${{ secrets.DEVELOPER_ID_CERTIFICATE_PASSWORD }}
+          PROFILE: ${{ secrets.DEVELOPER_ID_PROFILE }}
+        run: |
+          password=$(uuidgen)
+          security create-keychain -p "$password" "$KEYCHAIN"
+          security set-keychain-settings -lut 3600 "$KEYCHAIN"
+          security unlock-keychain -p "$password" "$KEYCHAIN"
+          base64 --decode <<< "$CERTIFICATE" > "$RUNNER_TEMP/certificate.p12"
+          security import "$RUNNER_TEMP/certificate.p12" -k "$KEYCHAIN" -P "$CERTIFICATE_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$password" "$KEYCHAIN" > /dev/null
+          read -r -a keychains <<< "$(security list-keychains -d user | xargs)"
+          security list-keychains -d user -s "$KEYCHAIN" "${keychains[@]}"
+          rm "$RUNNER_TEMP/certificate.p12"
+          base64 --decode <<< "$PROFILE" > "$RUNNER_TEMP/embedded.provisionprofile"
+
+      - name: Sign
+        run: |
+          app="$ARCHIVE/Products/Applications/Daybar.app"
+          entitlements="$RUNNER_TEMP/Daybar.entitlements"
+          cp Daybar/Daybar.entitlements "$entitlements"
+          /usr/libexec/PlistBuddy \
+            -c "Add :com.apple.application-identifier string $TEAM_ID.$BUNDLE_ID" \
+            -c "Add :com.apple.developer.team-identifier string $TEAM_ID" \
+            "$entitlements"
+          cp "$RUNNER_TEMP/embedded.provisionprofile" "$app/Contents/embedded.provisionprofile"
+          sign() { codesign --force --timestamp --options runtime --keychain "$KEYCHAIN" --sign "$IDENTITY" "$@"; }
+          if [ -d "$app/Contents/Frameworks" ]; then
+            find "$app/Contents/Frameworks" -depth \( -name "*.framework" -o -name "*.dylib" \) -print0 | while IFS= read -r -d '' item; do sign "$item"; done
+          fi
+          sign --entitlements "$entitlements" "$app"
+          codesign --verify --strict --deep --verbose=2 "$app"
+
+      - name: Notarize the app
+        env:
+          NOTARY_KEY: ${{ secrets.NOTARY_KEY }}
+          NOTARY_KEY_ID: ${{ secrets.NOTARY_KEY_ID }}
+          NOTARY_ISSUER_ID: ${{ secrets.NOTARY_ISSUER_ID }}
+        run: |
+          printf '%s' "$NOTARY_KEY" > "$RUNNER_TEMP/notary.p8"
+          app="$ARCHIVE/Products/Applications/Daybar.app"
+          ditto -c -k --keepParent "$app" "$RUNNER_TEMP/Daybar.zip"
+          xcrun notarytool submit "$RUNNER_TEMP/Daybar.zip" --key "$RUNNER_TEMP/notary.p8" --key-id "$NOTARY_KEY_ID" --issuer "$NOTARY_ISSUER_ID" --wait --timeout 30m
+          xcrun stapler staple "$app"
+
+      - name: Build and notarize the disk image
+        env:
+          NOTARY_KEY_ID: ${{ secrets.NOTARY_KEY_ID }}
+          NOTARY_ISSUER_ID: ${{ secrets.NOTARY_ISSUER_ID }}
+        run: |
+          mkdir -p "$DIST" "$RUNNER_TEMP/stage"
+          ditto "$ARCHIVE/Products/Applications/Daybar.app" "$RUNNER_TEMP/stage/Daybar.app"
+          ln -s /Applications "$RUNNER_TEMP/stage/Applications"
+          diskutil image create from --format ULFO --volumeName Daybar "$RUNNER_TEMP/stage" "$DIST/Daybar.dmg"
+          codesign --timestamp --keychain "$KEYCHAIN" --sign "$IDENTITY" "$DIST/Daybar.dmg"
+          xcrun notarytool submit "$DIST/Daybar.dmg" --key "$RUNNER_TEMP/notary.p8" --key-id "$NOTARY_KEY_ID" --issuer "$NOTARY_ISSUER_ID" --wait --timeout 30m
+          xcrun stapler staple "$DIST/Daybar.dmg"
+          spctl --assess --type open --context context:primary-signature --verbose=2 "$DIST/Daybar.dmg"
+          ditto -c -k --keepParent "$ARCHIVE/dSYMs/Daybar.app.dSYM" "$DIST/Daybar.app.dSYM.zip"
+          (cd "$DIST" && shasum -a 256 Daybar.dmg > Daybar.dmg.sha256)
+
+      - name: Attest the build
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: ${{ runner.temp }}/dist/Daybar.dmg
+
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          npx --yes changelogithub@15.0.5 || gh release create "$TAG" --title "$TAG" --generate-notes --verify-tag
+          gh release upload "$TAG" "$DIST/Daybar.dmg" "$DIST/Daybar.dmg.sha256" "$DIST/Daybar.app.dSYM.zip" --clobber
+
+      - name: Clean up
+        if: always()
+        run: |
+          security delete-keychain "$KEYCHAIN" 2>/dev/null || true
+          rm -f "$RUNNER_TEMP/notary.p8" "$RUNNER_TEMP/embedded.provisionprofile"

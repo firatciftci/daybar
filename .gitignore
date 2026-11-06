@@ -1,0 +1,12 @@
+.DS_Store
+xcuserdata/
+*.xcuserstate
+.swiftpm/
+
+/build/
+/DerivedData/
+/Daybar.xcodeproj/
+/Daybar/Info.plist
+/Daybar/Daybar.entitlements
+/screenshots/
+/tools/icon/
