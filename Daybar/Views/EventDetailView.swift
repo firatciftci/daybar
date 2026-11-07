@@ -93,15 +93,17 @@ struct EventDetailView: View {
                         .font(.system(size: 12).monospacedDigit())
                         .foregroundStyle(.tertiary)
                 }
-                if let event, event.hasRecurrenceRules {
-                    Label(RecurrenceChoice(rules: event.recurrenceRules).title, systemImage: "repeat")
+                if let event, let summary = RepeatRule.summary(of: event) {
+                    Label(summary, systemImage: "repeat")
                         .font(.system(size: 12))
                         .foregroundStyle(.secondary)
                 }
-                if let event, let alarm = event.alarms?.first {
-                    Label(AlertChoice(alarms: [alarm]).title, systemImage: "bell")
-                        .font(.system(size: 12))
-                        .foregroundStyle(.secondary)
+                if let event {
+                    ForEach(AlertOffset.relative(event.alarms).map(AlertOffset.minutes), id: \.self) { minutes in
+                        Label(AlertOffset.title(minutes, allDay: event.isAllDay), systemImage: "bell")
+                            .font(.system(size: 12))
+                            .foregroundStyle(.secondary)
+                    }
                 }
             }
         }

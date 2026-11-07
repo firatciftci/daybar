@@ -39,7 +39,7 @@ enum RecurrenceChoice: String, CaseIterable, Identifiable {
         }
         guard rules.count == 1, let rule = rules.first, rule.interval == 1,
             rule.daysOfTheWeek == nil, rule.daysOfTheMonth == nil, rule.monthsOfTheYear == nil,
-            rule.setPositions == nil
+            rule.setPositions == nil, rule.recurrenceEnd == nil
         else {
             self = .custom
             return
@@ -54,104 +54,67 @@ enum RecurrenceChoice: String, CaseIterable, Identifiable {
     }
 }
 
-enum AlertChoice: Int, CaseIterable, Identifiable {
-    case off = -1
-    case atTime = 0
-    case five = 5
-    case fifteen = 15
-    case thirty = 30
-    case hour = 60
-    case day = 1_440
-
-    var id: Int { rawValue }
-
-    var title: String {
-        switch self {
-        case .off: L.alertNone
-        case .atTime: L.alertAtTime
-        case .five, .fifteen, .thirty: L.alertMinutes(rawValue)
-        case .hour: L.alertHour
-        case .day: L.alertDay
-        }
-    }
-
-    init(alarms: Array<EKAlarm>?) {
-        guard let offset = alarms?.first?.relativeOffset else {
-            self = .off
-            return
-        }
-        let minutes = Int((-offset / 60).rounded())
-        self = Self(rawValue: minutes) ?? .fifteen
-    }
-}
-
 struct EventDraft: Equatable {
     var id = UUID()
     var occurrence: Occurrence?
-    var title: String
-    var location: String
+    var title = ""
+    var location = ""
     var isAllDay: Bool
     var start: Date
     var end: Date
     var calendarID: String
-    var recurrence: RecurrenceChoice
-    var alert: AlertChoice
-    var url: String
-    var notes: String
+    var recurrence = RecurrenceChoice.never
+    var repeatRule: RepeatRule
+    var alerts: Array<Int> = []
+    var url = ""
+    var notes = ""
     var notesBaseline = ""
-    var wasRecurring: Bool
+    var wasRecurring = false
+    private var recurrenceBaseline = RecurrenceChoice.never
+    private var repeatBaseline: RepeatRule
+    private var alertsBaseline: Array<Int> = []
 
     var isNew: Bool { occurrence == nil }
 
     static func new(start: Date, end: Date, allDay: Bool) -> Self {
-        Self(
-            occurrence: nil,
-            title: "",
-            location: "",
-            isAllDay: allDay,
-            start: start,
-            end: end,
-            calendarID: CalendarStore.shared.defaultCalendar?.calendarIdentifier ?? "",
-            recurrence: .never,
-            alert: .off,
-            url: "",
-            notes: "",
-            wasRecurring: false
-        )
+        Self(start: start, end: end, allDay: allDay)
     }
 
-    init(
-        occurrence: Occurrence?, title: String, location: String, isAllDay: Bool, start: Date, end: Date,
-        calendarID: String, recurrence: RecurrenceChoice, alert: AlertChoice, url: String, notes: String, wasRecurring: Bool
-    ) {
-        self.occurrence = occurrence
-        self.title = title
-        self.location = location
-        self.isAllDay = isAllDay
+    private init(start: Date, end: Date, allDay: Bool) {
+        isAllDay = allDay
         self.start = start
         self.end = end
-        self.calendarID = calendarID
-        self.recurrence = recurrence
-        self.alert = alert
-        self.url = url
-        self.notes = notes
-        self.wasRecurring = wasRecurring
+        calendarID = CalendarStore.shared.defaultCalendar?.calendarIdentifier ?? ""
+        repeatRule = RepeatRule(frequency: .weekly, start: start)
+        repeatBaseline = repeatRule
     }
 
     init(event: EKEvent, occurrence: Occurrence) {
+        self.init(
+            start: event.startDate, end: event.isAllDay ? event.endDate.addingTimeInterval(-1) : event.endDate,
+            allDay: event.isAllDay)
         self.occurrence = occurrence
         title = event.title ?? ""
         location = event.location ?? ""
-        isAllDay = event.isAllDay
-        start = event.startDate
-        end = event.isAllDay ? event.endDate.addingTimeInterval(-1) : event.endDate
         calendarID = event.calendar?.calendarIdentifier ?? ""
         recurrence = RecurrenceChoice(rules: event.recurrenceRules)
-        alert = AlertChoice(alarms: event.alarms)
+        if let rule = event.recurrenceRules?.first { repeatRule = RepeatRule(rule: rule, start: start) }
+        recurrenceBaseline = recurrence
+        repeatBaseline = repeatRule
+        alerts = AlertOffset.relative(event.alarms).map(AlertOffset.minutes)
+        alertsBaseline = alerts
         url = event.url?.absoluteString ?? ""
         notes = (event.notes ?? "").plainNotes
         notesBaseline = notes
         wasRecurring = event.hasRecurrenceRules
+    }
+
+    mutating func choose(_ choice: RecurrenceChoice) {
+        if choice == .custom, recurrence != .custom {
+            repeatRule =
+                recurrenceBaseline == .custom ? repeatBaseline : RepeatRule(frequency: recurrence.frequency ?? .weekly, start: start)
+        }
+        recurrence = choice
     }
 
     func apply(to event: EKEvent, store: CalendarStore) {
@@ -168,20 +131,22 @@ struct EventDraft: Equatable {
         if let calendar = store.ek.calendar(withIdentifier: calendarID) {
             event.calendar = calendar
         }
-        if recurrence != .custom {
+        if recurrence != recurrenceBaseline || (recurrence == .custom && repeatRule != repeatBaseline) {
             for rule in event.recurrenceRules ?? [] {
                 event.removeRecurrenceRule(rule)
             }
-            if let frequency = recurrence.frequency {
+            if recurrence == .custom {
+                event.addRecurrenceRule(repeatRule.make(start: start))
+            } else if let frequency = recurrence.frequency {
                 event.addRecurrenceRule(EKRecurrenceRule(recurrenceWith: frequency, interval: 1, end: nil))
             }
         }
-        if alert != AlertChoice(alarms: event.alarms) || event.alarms == nil {
-            for alarm in event.alarms ?? [] {
+        if alerts != alertsBaseline {
+            for alarm in AlertOffset.relative(event.alarms) {
                 event.removeAlarm(alarm)
             }
-            if alert != .off {
-                event.addAlarm(EKAlarm(relativeOffset: TimeInterval(-alert.rawValue * 60)))
+            for minutes in alerts {
+                event.addAlarm(EKAlarm(relativeOffset: TimeInterval(-minutes * 60)))
             }
         }
         event.url = URL(string: url.trimmingCharacters(in: .whitespaces)).flatMap { $0.scheme == nil ? nil : $0 }

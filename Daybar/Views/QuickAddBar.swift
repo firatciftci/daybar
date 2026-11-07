@@ -195,7 +195,7 @@ private struct ParsePreview: View {
                         detail("repeat", recurrenceTitle(recurrence))
                     }
                     if let minutes = entry.alertMinutes {
-                        detail("bell", L.alertMinutes(minutes))
+                        detail("bell", AlertOffset.title(minutes, allDay: entry.isAllDay))
                     }
                     if let calendar {
                         detail(

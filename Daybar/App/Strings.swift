@@ -100,9 +100,39 @@ enum L {
     static let repeatCustom = "Custom"
     static let alertNone = "None"
     static let alertAtTime = "At time of event"
-    static func alertMinutes(_ count: Int) -> String { "\(count) minutes before" }
-    static let alertHour = "1 hour before"
-    static let alertDay = "1 day before"
+    static let repeatFrequency = "Frequency"
+    static let frequencyDaily = "Daily"
+    static let frequencyWeekly = "Weekly"
+    static let frequencyMonthly = "Monthly"
+    static let frequencyYearly = "Yearly"
+    static func repeatEveryDays(_ count: Int) -> String { count == 1 ? repeatDaily : "Every \(count) days" }
+    static func repeatEveryWeeks(_ count: Int) -> String { count == 1 ? repeatWeekly : "Every \(count) weeks" }
+    static func repeatEveryMonths(_ count: Int) -> String { count == 1 ? repeatMonthly : "Every \(count) months" }
+    static func repeatEveryYears(_ count: Int) -> String { count == 1 ? repeatYearly : "Every \(count) years" }
+    static func repeatOnDays(_ base: String, _ days: String) -> String { "\(base) on \(days)" }
+    static func repeatOnDate(_ base: String, _ day: String) -> String { "\(base) on the \(day)" }
+    static func repeatOnWeekday(_ base: String, _ ordinal: String, _ weekday: String) -> String {
+        "\(base) on the \(ordinal) \(weekday)"
+    }
+    static func monthlyOnDate(_ day: String) -> String { "On the \(day)" }
+    static func monthlyOnWeekday(_ ordinal: String, _ weekday: String) -> String { "On the \(ordinal) \(weekday)" }
+    static let ordinalWords = ["first", "second", "third", "fourth"]
+    static let ordinalLast = "last"
+    static let repeatEnd = "End repeat"
+    static let repeatEndNever = "Never"
+    static let repeatEndOnDate = "On a date"
+    static let repeatEndAfter = "After a number of times"
+    static let repeatEndDate = "Ends on"
+    static func repeatCount(_ count: Int) -> String { count == 1 ? "Once" : "\(count) times" }
+    static func repeatUntil(_ summary: String, _ date: String) -> String { "\(summary), until \(date)" }
+    static func repeatTimesSummary(_ summary: String, _ count: Int) -> String {
+        count == 1 ? "\(summary), once" : "\(summary), \(count) times"
+    }
+    static func alertBefore(_ duration: String) -> String { "\(duration) before" }
+    static func alertAfter(_ duration: String) -> String { "\(duration) after" }
+    static func alertOnDay(_ time: String) -> String { "On the day at \(time)" }
+    static func alertDaysBefore(_ duration: String, _ time: String) -> String { "\(duration) before, at \(time)" }
+    static let alertRows = [alertField, "Second alert", "Third alert", "Fourth alert", "Fifth alert"]
     static let newEvent = "New event"
     static let newEventTitle = "New event"
     static let tabGeneral = "General"

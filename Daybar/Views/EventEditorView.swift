@@ -86,18 +86,25 @@ struct EventForm: View {
                     .focused($focus, equals: .end)
             }
             Section {
-                Picker(L.repeatField, selection: $model.draft.recurrence) {
-                    ForEach(RecurrenceChoice.allCases.filter { $0 != .custom || model.draft.recurrence == .custom }) { choice in
+                Picker(
+                    L.repeatField,
+                    selection: Binding {
+                        model.draft.recurrence
+                    } set: {
+                        model.draft.choose($0)
+                    }.animation(.snappy)
+                ) {
+                    ForEach(RecurrenceChoice.allCases) { choice in
                         Text(choice.title).tag(choice)
                     }
                 }
                 .focused($focus, equals: .recurrence)
-                Picker(L.alertField, selection: $model.draft.alert) {
-                    ForEach(AlertChoice.allCases) { choice in
-                        Text(choice.title).tag(choice)
-                    }
+                if model.draft.recurrence == .custom {
+                    RepeatRows(rule: $model.draft.repeatRule, start: model.draft.start)
                 }
-                .focused($focus, equals: .alert)
+            }
+            Section {
+                AlertRows(alerts: $model.draft.alerts, allDay: model.draft.isAllDay, focus: $focus)
                 Picker(L.calendarField, selection: $model.draft.calendarID) {
                     ForEach(store.writableCalendars, id: \.calendarIdentifier) { calendar in
                         Label {
