@@ -63,6 +63,7 @@ final class Preferences {
     var weatherPlace: WeatherPlace? { didSet { encode(weatherPlace, "weatherPlace") } }
     var compact: Bool { didSet { store(compact, "compact") } }
     var showQuickAdd: Bool { didSet { store(showQuickAdd, "showQuickAdd") } }
+    var hasOnboarded: Bool { didSet { store(hasOnboarded, "hasOnboarded") } }
     var panelHeight: Double { didSet { store(panelHeight, "panelHeight") } }
 
     private init() {
@@ -84,6 +85,7 @@ final class Preferences {
         weatherPlace = Self.decode(WeatherPlace.self, d, "weatherPlace")
         compact = d.bool(forKey: "compact")
         showQuickAdd = d.object(forKey: "showQuickAdd") as? Bool ?? true
+        hasOnboarded = d.bool(forKey: "hasOnboarded")
         panelHeight = d.double(forKey: "panelHeight")
     }
 

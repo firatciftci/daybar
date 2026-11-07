@@ -9,6 +9,7 @@ extension KeyboardShortcuts.Name {
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var panel: PanelController?
     private var menuBar: MenuBarController?
+    private var welcome: WelcomeWindowController?
 
     func applicationDidFinishLaunching(_: Notification) {
         NSApp.mainMenu = Self.makeMainMenu()
@@ -23,8 +24,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         Timer.scheduledTimer(withTimeInterval: 1_800, repeats: true) { _ in
             MainActor.assumeIsolated { WeatherModel.shared.refresh() }
         }
-        if CalendarStore.shared.access != .granted {
-            menuBar.togglePanel()
+        if !Preferences.shared.hasOnboarded || CalendarStore.shared.access != .granted {
+            let welcome = WelcomeWindowController()
+            self.welcome = welcome
+            welcome.show { [weak self, weak menuBar] in
+                self?.welcome = nil
+                menuBar?.togglePanel()
+            }
         }
     }
 

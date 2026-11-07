@@ -103,6 +103,10 @@ final class WeatherModel: NSObject, CLLocationManagerDelegate {
         }
     }
 
+    func requestLocationAccess() {
+        manager.requestWhenInUseAuthorization()
+    }
+
     func lookUp(city: String) async -> WeatherPlace? {
         guard let request = MKGeocodingRequest(addressString: city) else { return nil }
         guard let item = try? await request.mapItems.first else { return nil }

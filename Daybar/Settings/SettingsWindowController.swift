@@ -18,6 +18,7 @@ final class SettingsWindowController: NSWindowController {
                     .environment(CalendarStore.shared)
                     .environment(Preferences.shared)
                     .environment(WeatherModel.shared)
+                    .environment(Permissions.shared)
                     .frame(width: 500)
                     .fixedSize(horizontal: false, vertical: true))
             host.sizingOptions = .preferredContentSize
@@ -31,6 +32,7 @@ final class SettingsWindowController: NSWindowController {
         add(L.tabMenuBar, symbol: "menubar.rectangle", MenuBarPane())
         add(L.tabCalendars, symbol: "calendar", CalendarsPane())
         add(L.tabWeather, symbol: "cloud.sun", WeatherPane())
+        add(L.tabPermissions, symbol: "hand.raised", PermissionsPane())
         let window = NSWindow(contentViewController: tabs)
         window.styleMask = [.titled, .closable]
         window.toolbarStyle = .preference
@@ -44,8 +46,27 @@ final class SettingsWindowController: NSWindowController {
     func show() {
         guard let window else { return }
         if !window.isVisible { window.center() }
-        NSApp.activate()
-        window.makeKeyAndOrderFront(nil)
+        window.presentInFront()
+    }
+}
+
+private struct PermissionsPane: View {
+    @Environment(Permissions.self) private var permissions
+
+    var body: some View {
+        VStack(spacing: 10) {
+            PermissionList()
+            Text(L.permissionsFooter)
+                .font(.system(size: 11.5))
+                .foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 4)
+        }
+        .padding(20)
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            permissions.refresh()
+        }
+        .onAppear { permissions.refresh() }
     }
 }
 

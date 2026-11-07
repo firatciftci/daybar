@@ -410,3 +410,57 @@ struct MeetingGlyph: View {
             .frame(width: size, height: size)
     }
 }
+
+extension NSWindow {
+    func presentInFront() {
+        ForegroundWindows.shared.present(self)
+    }
+}
+
+final class ForegroundWindows {
+    static let shared = ForegroundWindows()
+
+    private var windows: Set<ObjectIdentifier> = []
+    private var observers: Array<any NSObjectProtocol> = []
+
+    private init() {
+        let center = NotificationCenter.default
+        observers.append(
+            center.addObserver(forName: NSApplication.didBecomeActiveNotification, object: nil, queue: .main) { _ in
+                MainActor.assumeIsolated { Self.shared.settle() }
+            })
+        observers.append(
+            center.addObserver(forName: NSWindow.willCloseNotification, object: nil, queue: .main) { note in
+                guard let window = note.object as? NSWindow else { return }
+                let id = ObjectIdentifier(window)
+                MainActor.assumeIsolated { Self.shared.release(id) }
+            })
+    }
+
+    func present(_ window: NSWindow) {
+        windows.insert(ObjectIdentifier(window))
+        NSApp.setActivationPolicy(.regular)
+        NSApp.activate()
+        if !NSApp.isActive, window.level == .normal { window.level = .floating }
+        window.orderFrontRegardless()
+        window.makeKey()
+        Task {
+            try? await Task.sleep(for: .milliseconds(120))
+            NSApp.activate()
+            window.makeKeyAndOrderFront(nil)
+        }
+    }
+
+    private func settle() {
+        for window in NSApp.windows where windows.contains(ObjectIdentifier(window)) && !(window is WelcomeWindow) {
+            window.level = .normal
+        }
+    }
+
+    private func release(_ id: ObjectIdentifier) {
+        guard windows.remove(id) != nil, windows.isEmpty else { return }
+        NSApp.setActivationPolicy(.accessory)
+    }
+}
+
+final class WelcomeWindow: NSWindow {}
