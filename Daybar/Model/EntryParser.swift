@@ -67,6 +67,7 @@ enum EntryParser {
     private static let durationPattern = regex(#"\bfor\s+(\d+(?:\.\d+)?)\s*(h|hr|hrs|hours?|m|min|mins|minutes?)\b"#)
     private static let timePattern = regex(
         #"(\d{1,2}(:\d{2})?\s*(am|pm|a\.m\.|p\.m\.))|(\d{1,2}:\d{2})|\bnoon\b|\bmidnight\b|\btonight\b|\bat\s+\d{1,2}\b"#)
+    private static let mealWord = regex(#"^(?:breakfast|brunch|lunch|dinner|supper)\b\s*"#)
     private static let locationPattern = regex(#"\s(?:at|@)\s+(.+)$"#)
     private static let danglingWords = regex(#"(?:\s+|^)(?:on|at|from|for|by|,|-)\s*$"#)
     private static let leadingPreposition = regex(#"(?:^|\s)(?:on|at|from|by)\s+$"#)
@@ -207,8 +208,12 @@ enum EntryParser {
             let length = max(1, Int(((explicitDuration ?? 0) / 86_400).rounded(.up)))
             entry.end = Calendar.current.date(byAdding: .day, value: length, to: day)
         }
-        entry.spans.append(ParsedSpan(role: .when, range: source.original(match.range)))
-        source.replace(withPreposition(match.range, in: text), with: " ")
+        var range = match.range
+        if let meal = first(mealWord, in: matched), meal.range.length < range.length {
+            range = NSRange(location: range.location + meal.range.length, length: range.length - meal.range.length)
+        }
+        entry.spans.append(ParsedSpan(role: .when, range: source.original(range)))
+        source.replace(withPreposition(range, in: text), with: " ")
     }
 
     private static func first(_ regex: NSRegularExpression?, in text: String) -> NSTextCheckingResult? {
