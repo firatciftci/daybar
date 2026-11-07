@@ -46,30 +46,52 @@ final class Preferences {
 
     @ObservationIgnored private let defaults = UserDefaults.standard
 
-    var defaultView: PanelMode { didSet { store(defaultView.rawValue, "defaultView") } }
-    var weekStart: Int { didSet { store(weekStart, "weekStart") } }
-    var showWeekNumbers: Bool { didSet { store(showWeekNumbers, "showWeekNumbers") } }
+    var defaultView = PanelMode.month { didSet { store(defaultView.rawValue, "defaultView") } }
+    var weekStart = 0 { didSet { store(weekStart, "weekStart") } }
+    var showWeekNumbers = false { didSet { store(showWeekNumbers, "showWeekNumbers") } }
     var secondTimeZoneID: String? { didSet { store(secondTimeZoneID, "secondTimeZoneID") } }
-    var showMeetingIcon: Bool { didSet { store(showMeetingIcon, "showMeetingIcon") } }
-    var meetingLeadMinutes: Int { didSet { store(meetingLeadMinutes, "meetingLeadMinutes") } }
-    var showDeclined: Bool { didSet { store(showDeclined, "showDeclined") } }
-    var showReminders: Bool { didSet { store(showReminders, "showReminders") } }
+    var showMeetingIcon = true { didSet { store(showMeetingIcon, "showMeetingIcon") } }
+    var meetingLeadMinutes = 10 { didSet { store(meetingLeadMinutes, "meetingLeadMinutes") } }
+    var showDeclined = false { didSet { store(showDeclined, "showDeclined") } }
+    var showReminders = true { didSet { store(showReminders, "showReminders") } }
     var defaultCalendarID: String? { didSet { store(defaultCalendarID, "defaultCalendarID") } }
-    var hiddenCalendarIDs: Set<String> { didSet { encode(hiddenCalendarIDs, "hiddenCalendarIDs") } }
-    var calendarSets: Array<CalendarSet> { didSet { encode(calendarSets, "calendarSets") } }
+    var hiddenCalendarIDs: Set<String> = [] { didSet { encode(hiddenCalendarIDs, "hiddenCalendarIDs") } }
+    var calendarSets: Array<CalendarSet> = [] { didSet { encode(calendarSets, "calendarSets") } }
     var activeSetID: UUID? { didSet { store(activeSetID?.uuidString, "activeSetID") } }
-    var showWeather: Bool { didSet { store(showWeather, "showWeather") } }
-    var useCurrentLocation: Bool { didSet { store(useCurrentLocation, "useCurrentLocation") } }
+    var showWeather = true { didSet { store(showWeather, "showWeather") } }
+    var useCurrentLocation = true { didSet { store(useCurrentLocation, "useCurrentLocation") } }
     var weatherPlace: WeatherPlace? { didSet { encode(weatherPlace, "weatherPlace") } }
-    var compact: Bool { didSet { store(compact, "compact") } }
-    var showQuickAdd: Bool { didSet { store(showQuickAdd, "showQuickAdd") } }
-    var separateAllDay: Bool { didSet { store(separateAllDay, "separateAllDay") } }
-    var remindersByTime: Bool { didSet { store(remindersByTime, "remindersByTime") } }
-    var hasOnboarded: Bool { didSet { store(hasOnboarded, "hasOnboarded") } }
-    var panelHeight: Double { didSet { store(panelHeight, "panelHeight") } }
+    var compact = false { didSet { store(compact, "compact") } }
+    var showQuickAdd = true { didSet { store(showQuickAdd, "showQuickAdd") } }
+    var separateAllDay = false { didSet { store(separateAllDay, "separateAllDay") } }
+    var remindersByTime = false { didSet { store(remindersByTime, "remindersByTime") } }
+    var hasOnboarded = false { didSet { store(hasOnboarded, "hasOnboarded") } }
+    var panelHeight = 0.0 { didSet { store(panelHeight, "panelHeight") } }
+
+    @ObservationIgnored private var loading = false
+
+    private static let keptKeys: Set<String> = ["calendarSets", "hasOnboarded"]
+    private static let keys = [
+        "defaultView", "weekStart", "showWeekNumbers", "secondTimeZoneID", "showMeetingIcon", "meetingLeadMinutes", "showDeclined",
+        "showReminders", "defaultCalendarID", "hiddenCalendarIDs", "calendarSets", "activeSetID", "showWeather", "useCurrentLocation",
+        "weatherPlace", "compact", "showQuickAdd", "separateAllDay", "remindersByTime", "hasOnboarded", "panelHeight", "hiddenMeetingIDs",
+    ]
 
     private init() {
-        let d = UserDefaults.standard
+        load()
+    }
+
+    func restoreDefaults() {
+        for key in Self.keys where !Self.keptKeys.contains(key) {
+            defaults.removeObject(forKey: key)
+        }
+        load()
+    }
+
+    private func load() {
+        loading = true
+        defer { loading = false }
+        let d = defaults
         defaultView = d.string(forKey: "defaultView").flatMap(PanelMode.init(rawValue:)) ?? .month
         weekStart = d.integer(forKey: "weekStart")
         showWeekNumbers = d.bool(forKey: "showWeekNumbers")
@@ -124,6 +146,7 @@ final class Preferences {
     }
 
     private func store(_ value: Any?, _ key: String) {
+        guard !loading else { return }
         if let value {
             defaults.set(value, forKey: key)
         } else {
@@ -132,6 +155,7 @@ final class Preferences {
     }
 
     private func encode<T: Encodable>(_ value: T?, _ key: String) {
+        guard !loading else { return }
         guard let value, let data = try? JSONEncoder().encode(value) else {
             defaults.removeObject(forKey: key)
             return

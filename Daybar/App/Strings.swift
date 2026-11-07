@@ -187,6 +187,15 @@ enum L {
     static let doneBodyNoShortcut = "Click the date in the menu bar to open Daybar."
     static let openDaybar = "Open Daybar"
     static let tabPermissions = "Permissions"
+    static let tabAdvanced = "Advanced"
+    static let restoreDefaultsTitle = "Restore default settings"
+    static let restoreDefaultsDetail = "Puts every Daybar setting back to its original value. Calendar sets are kept."
+    static let restoreDefaultsButton = "Restore Defaults…"
+    static let restoreDefaultsAlertTitle = "Restore default settings?"
+    static let restoreDefaultsAlertMessage =
+        "This resets display options, weather, the keyboard shortcut, and hidden calendars. Your calendar sets, Open at login, and permissions stay as they are."
+    static let restoreDefaultsConfirm = "Restore Defaults"
+    static let restoreDefaultsDone = "Defaults restored"
     static let permissionsFooter = "Turned something off? Open Settings to change it."
     static func newEventOn(_ day: String) -> String { "New event on \(day)" }
     static func moreEvents(_ count: Int) -> String { "\(count) more" }

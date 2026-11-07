@@ -42,6 +42,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         add(L.tabCalendars, symbol: "calendar", CalendarsPane())
         add(L.tabWeather, symbol: "cloud.sun", WeatherPane())
         add(L.tabPermissions, symbol: "hand.raised", PermissionsPane())
+        add(L.tabAdvanced, symbol: "gearshape.2", AdvancedPane())
         let window = NSWindow(contentViewController: tabs)
         window.styleMask = [.titled, .closable, .miniaturizable]
         window.toolbarStyle = .preference
@@ -97,6 +98,54 @@ private struct PermissionsPane: View {
             permissions.refresh()
         }
         .onAppear { permissions.refresh() }
+    }
+}
+
+private struct AdvancedPane: View {
+    @Environment(CalendarStore.self) private var store
+    @Environment(WeatherModel.self) private var weather
+    @State private var confirming = false
+    @State private var restored = false
+
+    var body: some View {
+        Form {
+            Section {
+                LabeledContent {
+                    ZStack(alignment: .trailing) {
+                        if restored {
+                            Label(L.restoreDefaultsDone, systemImage: "checkmark.circle.fill")
+                                .foregroundStyle(.secondary)
+                                .transition(.opacity)
+                        } else {
+                            Button(L.restoreDefaultsButton) { confirming = true }
+                                .transition(.opacity)
+                        }
+                    }
+                } label: {
+                    Text(L.restoreDefaultsTitle)
+                    Text(L.restoreDefaultsDetail)
+                }
+            }
+        }
+        .formStyle(.grouped)
+        .alert(L.restoreDefaultsAlertTitle, isPresented: $confirming) {
+            Button(L.restoreDefaultsConfirm, role: .destructive, action: restore)
+            Button(L.cancel, role: .cancel) {}
+        } message: {
+            Text(L.restoreDefaultsAlertMessage)
+        }
+    }
+
+    private func restore() {
+        Preferences.shared.restoreDefaults()
+        KeyboardShortcuts.reset(.togglePanel)
+        store.reload()
+        weather.refresh(force: true)
+        withAnimation(Motion.fade) { restored = true }
+        Task {
+            try? await Task.sleep(for: .seconds(2.5))
+            withAnimation(Motion.fade) { restored = false }
+        }
     }
 }
 
