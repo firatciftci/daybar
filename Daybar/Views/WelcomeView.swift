@@ -9,7 +9,7 @@ final class WelcomeWindowController: NSWindowController, NSWindowDelegate {
     init() {
         let window = WelcomeWindow(
             contentRect: NSRect(x: 0, y: 0, width: 480, height: 600),
-            styleMask: [.titled, .closable, .fullSizeContentView],
+            styleMask: [.titled, .closable, .miniaturizable, .fullSizeContentView],
             backing: .buffered,
             defer: false
         )

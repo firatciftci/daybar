@@ -422,6 +422,8 @@ final class ForegroundWindows {
 
     private var windows: Set<ObjectIdentifier> = []
     private var observers: Array<any NSObjectProtocol> = []
+    private var activation: Task<Void, Never>?
+    private var lastOtherApp: NSRunningApplication?
 
     private init() {
         let center = NotificationCenter.default
@@ -435,23 +437,50 @@ final class ForegroundWindows {
                 let id = ObjectIdentifier(window)
                 MainActor.assumeIsolated { Self.shared.release(id) }
             })
+        observers.append(
+            NSWorkspace.shared.notificationCenter.addObserver(
+                forName: NSWorkspace.didActivateApplicationNotification, object: nil, queue: .main
+            ) { note in
+                guard let app = note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication,
+                    app.processIdentifier != ProcessInfo.processInfo.processIdentifier
+                else { return }
+                MainActor.assumeIsolated { Self.shared.lastOtherApp = app }
+            })
+        if let front = NSWorkspace.shared.frontmostApplication, front.processIdentifier != ProcessInfo.processInfo.processIdentifier {
+            lastOtherApp = front
+        }
     }
 
     func present(_ window: NSWindow) {
         windows.insert(ObjectIdentifier(window))
-        NSApp.setActivationPolicy(.regular)
-        NSApp.activate()
+        if NSApp.activationPolicy() != .regular { NSApp.setActivationPolicy(.regular) }
+        window.collectionBehavior.insert(.moveToActiveSpace)
+        if window.isMiniaturized { window.deminiaturize(nil) }
         if !NSApp.isActive, window.level == .normal { window.level = .floating }
         window.orderFrontRegardless()
         window.makeKey()
-        Task {
-            try? await Task.sleep(for: .milliseconds(120))
-            NSApp.activate()
-            window.makeKeyAndOrderFront(nil)
+        activation?.cancel()
+        activation = Task {
+            for _ in 0..<20 {
+                if NSApp.isActive, window.isKeyWindow { break }
+                Self.activate()
+                window.makeKeyAndOrderFront(nil)
+                try? await Task.sleep(for: .milliseconds(100))
+                guard !Task.isCancelled else { return }
+            }
+            settle()
         }
     }
 
+    private static func activate() {
+        if let front = NSWorkspace.shared.frontmostApplication, front.processIdentifier != ProcessInfo.processInfo.processIdentifier {
+            _ = NSRunningApplication.current.activate(from: front)
+        }
+        NSApp.activate()
+    }
+
     private func settle() {
+        guard NSApp.isActive else { return }
         for window in NSApp.windows where windows.contains(ObjectIdentifier(window)) && !(window is WelcomeWindow) {
             window.level = .normal
         }
@@ -459,7 +488,14 @@ final class ForegroundWindows {
 
     private func release(_ id: ObjectIdentifier) {
         guard windows.remove(id) != nil, windows.isEmpty else { return }
+        activation?.cancel()
         NSApp.setActivationPolicy(.accessory)
+        Task {
+            try? await Task.sleep(for: .milliseconds(50))
+            let busy = NSApp.windows.contains { $0.isVisible && $0.canBecomeKey }
+            guard NSApp.isActive, !busy else { return }
+            lastOtherApp?.activate()
+        }
     }
 }
 

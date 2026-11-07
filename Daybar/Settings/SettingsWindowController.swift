@@ -34,7 +34,7 @@ final class SettingsWindowController: NSWindowController {
         add(L.tabWeather, symbol: "cloud.sun", WeatherPane())
         add(L.tabPermissions, symbol: "hand.raised", PermissionsPane())
         let window = NSWindow(contentViewController: tabs)
-        window.styleMask = [.titled, .closable]
+        window.styleMask = [.titled, .closable, .miniaturizable]
         window.toolbarStyle = .preference
         window.isReleasedWhenClosed = false
         super.init(window: window)
