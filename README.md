@@ -10,42 +10,64 @@
 <p align="center">Your calendar in the menu bar, one click away.</p>
 
 <p align="center">
-  <a href="https://github.com/firatciftci/daybar/releases/latest">Download</a> ·
-  <a href="https://github.com/firatciftci/daybar/actions/workflows/ci.yml"><img src="https://github.com/firatciftci/daybar/actions/workflows/ci.yml/badge.svg" alt="CI status"></a>
+  <a href="https://github.com/firatciftci/daybar/releases/latest"><b>Download for macOS</b></a>
+  &nbsp;·&nbsp;
+  <a href="https://github.com/firatciftci/daybar/actions/workflows/ci.yml"><img src="https://github.com/firatciftci/daybar/actions/workflows/ci.yml/badge.svg" alt="CI status" align="center"></a>
 </p>
 
-Daybar puts today's date in your menu bar. Click it to see your month, week, or day, check what's next, and add an event by typing it the way you'd say it. It reads and writes the same calendars and reminders as the Calendar and Reminders apps, so there's no account to set up and nothing to sync.
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset=".github/assets/month-dark.webp">
+    <img src=".github/assets/month-light.webp" width="400" alt="The Daybar panel showing a month calendar above today's events, reminders, and weather">
+  </picture>
+</p>
 
-## Features
+Daybar puts today's date in your menu bar. Click it to see your month, week, or day, check what's next, and add events by typing them the way you'd say them. It uses the calendars and reminders already on your Mac, so there's no account to create and nothing to sync.
 
-- Four views. Switch between a month grid, a week strip, a day timeline, and an Up next list that shows what's happening now and your free time around it.
-- Next event in the menu bar. The title of your next event and a countdown sit next to the date, then switch to the time left once it starts.
-- Quick add in plain words. Type "Coffee with Ana Friday 9am at Blue Bottle /work" and Daybar fills in the time, place, and calendar, coloring each part as it recognizes it.
-- Join calls from the menu bar. When a Zoom, Teams, Meet, Webex, or FaceTime call is about to start, an icon appears next to the date. Click it to join.
-- Edit without leaving the panel. Create, edit, duplicate, and delete events, including repeating ones, with the calendar still in view. Set custom repeats like every other Tuesday and Thursday, and add more than one alert.
-- Undo. Take back an add, edit, move, or delete with the Undo button that appears after each change, or with ⌘Z.
-- Reminders alongside events. Overdue and upcoming reminders sit in the list, and you can check them off there.
-- Weather for each day. Daily forecasts from Apple Weather, for your current location or a city you choose.
-- Birthdays and attendees. Contact names and photos for birthdays and the people invited to an event.
-- Calendar sets. Group calendars into sets like Work and Home, then switch between them.
-- Search. Find events by title, place, notes, or calendar, with matching days marked in the grid.
-- Shortcuts and Focus. Add events, quick add a sentence, or get your upcoming events from Shortcuts and Siri. A Focus filter shows only the calendars you pick while that Focus is on.
+## Highlights
 
-## Requirements
+### Four ways to see your time
 
-macOS 27 or later.
+Month, Week, Day, and Up next, with weather, birthdays, and reminders next to your events. Up next shows what's happening now and how long you're free.
 
-## Install
+<table>
+  <tr>
+    <td>
+      <picture>
+        <source media="(prefers-color-scheme: dark)" srcset=".github/assets/week-dark.webp">
+        <img src=".github/assets/week-light.webp" width="260" alt="Week view with a strip of days above the week's events">
+      </picture>
+    </td>
+    <td>
+      <picture>
+        <source media="(prefers-color-scheme: dark)" srcset=".github/assets/day-dark.webp">
+        <img src=".github/assets/day-light.webp" width="260" alt="Day view with a timeline of today's events and a line at the current time">
+      </picture>
+    </td>
+    <td>
+      <picture>
+        <source media="(prefers-color-scheme: dark)" srcset=".github/assets/upnext-dark.webp">
+        <img src=".github/assets/upnext-light.webp" width="260" alt="Up next view showing free time until the next event and a list of upcoming events">
+      </picture>
+    </td>
+  </tr>
+  <tr>
+    <td align="center">Week</td>
+    <td align="center">Day</td>
+    <td align="center">Up next</td>
+  </tr>
+</table>
 
-1. Download `Daybar.dmg` from the [latest release](https://github.com/firatciftci/daybar/releases/latest).
-2. Open it and drag Daybar to your Applications folder.
-3. Open Daybar and allow access to your calendars when macOS asks.
+### Add events by typing
 
-Each release is signed with a Developer ID and notarized by Apple.
+Type a sentence and press Return. Daybar colors the date, place, and calendar as it recognizes them, and previews the event before adding it.
 
-## Quick add
-
-Type into the field at the top of the panel and press Return.
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset=".github/assets/quick-add-dark.webp">
+    <img src=".github/assets/quick-add-light.webp" width="380" alt="Typing “Dinner Fri 7pm at Café Luna /home” into Daybar, which highlights each part, previews the event, and adds it to Friday">
+  </picture>
+</p>
 
 | You type | Daybar adds |
 | --- | --- |
@@ -55,13 +77,65 @@ Type into the field at the top of the panel and press Return.
 | `Flight to Istanbul Dec 20` | An all-day event |
 | `remind me to call the bank Friday` | A reminder due Friday |
 
-Start with `remind`, `todo`, or `task` to add a reminder. Add `/name` to pick a calendar or list by the start of its name.
+Start with `remind`, `todo`, or `task` to add a reminder instead. Add `/name` to pick a calendar or list by the start of its name.
+
+### Your next event in the menu bar
+
+<p align="center">
+  <img src=".github/assets/menubar.png" width="288" alt="The Daybar menu bar item showing a camera icon, the date, and “Call with Mom in 3m”">
+</p>
+
+The title of your next event and a countdown sit next to the date, then switch to the time left once it starts. When a Zoom, Teams, Meet, Webex, or FaceTime call is about to start, click the camera to join.
+
+### Edit without leaving the panel
+
+<table>
+  <tr>
+    <td>
+      <picture>
+        <source media="(prefers-color-scheme: dark)" srcset=".github/assets/detail-dark.webp">
+        <img src=".github/assets/detail-light.webp" width="300" alt="Event details with alerts, a Join Zoom button, a map, and notes">
+      </picture>
+    </td>
+    <td>
+      <picture>
+        <source media="(prefers-color-scheme: dark)" srcset=".github/assets/editor-dark.webp">
+        <img src=".github/assets/editor-light.webp" width="300" alt="The event editor with a custom repeat set to every week on Tuesday and Thursday">
+      </picture>
+    </td>
+  </tr>
+</table>
+
+Create, edit, duplicate, and delete events, including repeating ones, with your calendar still in view. Set custom repeats like every Tuesday and Thursday, add up to five alerts, and undo any change with ⌘Z.
+
+### And more
+
+- Reminders: overdue and upcoming reminders sit with your events, and you can check them off there.
+- Weather: daily forecasts from Apple Weather for where you are or a city you choose.
+- Birthdays and attendees: names and photos from Contacts.
+- Calendar sets: group calendars into sets like Work and Home, then switch between them.
+- Search: find events by title, place, notes, or calendar.
+- Shortcuts and Focus: add events and get what's next from Shortcuts and Siri, and choose which calendars show during each Focus.
+
+## Install
+
+Daybar needs macOS 27 or later.
+
+1. Download `Daybar.dmg` from the [latest release](https://github.com/firatciftci/daybar/releases/latest).
+2. Open it and drag Daybar to your Applications folder.
+3. Open Daybar and allow access to your calendars when macOS asks.
+
+Every release is signed with a Developer ID, notarized by Apple, and has a build attestation you can check:
+
+```sh
+gh attestation verify Daybar.dmg --repo firatciftci/daybar
+```
 
 ## Keyboard shortcuts
 
 | Shortcut | Action |
 | --- | --- |
-| <kbd>⌥</kbd><kbd>⌘</kbd><kbd>K</kbd> | Show or hide Daybar from anywhere (you can change this in Settings) |
+| <kbd>⌥</kbd><kbd>⌘</kbd><kbd>K</kbd> | Show or hide Daybar from anywhere (change it in Settings) |
 | <kbd>⌘</kbd><kbd>1</kbd> to <kbd>⌘</kbd><kbd>4</kbd> | Switch between Month, Week, Day, and Up next |
 | <kbd>⌘</kbd><kbd>T</kbd> | Go to today |
 | <kbd>⌘</kbd><kbd>N</kbd> | New event |
@@ -90,15 +164,21 @@ xcodegen generate
 open Daybar.xcodeproj
 ```
 
-The Xcode project is generated from `project.yml`, so edit that file instead of the project settings, and run `xcodegen generate` again after changing it. To build without a signing team, pass `CODE_SIGNING_ALLOWED=NO` to `xcodebuild`. Weather needs a signed build with the WeatherKit capability.
+The Xcode project is generated from `project.yml`, so change that file instead of the project settings and run `xcodegen generate` again. To build without a signing team, pass `CODE_SIGNING_ALLOWED=NO` to `xcodebuild`. Weather needs a signed build with the WeatherKit capability.
 
-Before you open a pull request, run the same checks CI does:
+To see sample events instead of your own, for example when taking screenshots, launch with `-demo`. Add `-light` or `-dark` to pick an appearance. Nothing you do in demo mode touches your calendars.
+
+```sh
+open Daybar.app --args -demo -dark
+```
+
+Before you open a pull request, run the same checks as CI:
 
 ```sh
 tools/check.sh
 ```
 
-It formats the code with swift-format, lints it with SwiftLint, builds with warnings treated as errors, and runs SwiftLint's analyzer on the build. See [CONTRIBUTING.md](CONTRIBUTING.md) for more.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for more.
 
 ## License
 
