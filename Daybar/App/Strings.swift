@@ -121,6 +121,12 @@ enum L {
     static let meetingIconFooter =
         "A Zoom, Teams, Meet, Webex, or FaceTime icon appears next to the date when a call is about to start. Click it to join."
     static let meetingLead = "Show icon"
+    static let showNextEvent = "Show next event in the menu bar"
+    static let nextEventWithin = "Show events starting within"
+    static let restOfDay = "Rest of the day"
+    static let nextEventFooter = "Shows the event title and a countdown next to the date. Events in progress show the time left."
+    static func menuBarStartsIn(_ title: String, _ duration: String) -> String { "\(title) in \(duration)" }
+    static func menuBarTimeLeft(_ title: String, _ duration: String) -> String { "\(title) · \(duration) left" }
     static func minutesBefore(_ count: Int) -> String { "\(count) minutes before" }
     static let showDeclined = "Show declined events"
     static let showReminders = "Show reminders"

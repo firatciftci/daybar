@@ -250,6 +250,20 @@ private struct MenuBarPane: View {
         @Bindable var prefs = prefs
         Form {
             Section {
+                Toggle(L.showNextEvent, isOn: $prefs.showNextEvent)
+                Picker(L.nextEventWithin, selection: $prefs.nextEventMinutes) {
+                    ForEach([15, 30, 60, 180], id: \.self) { minutes in
+                        Text(Duration.seconds(minutes * 60).formatted(.units(allowed: [.hours, .minutes], width: .wide))).tag(minutes)
+                    }
+                    Text(L.restOfDay).tag(0)
+                }
+                .disabled(!prefs.showNextEvent)
+            } footer: {
+                Text(L.nextEventFooter)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Section {
                 Toggle(L.meetingIcon, isOn: $prefs.showMeetingIcon)
                 Picker(L.meetingLead, selection: $prefs.meetingLeadMinutes) {
                     ForEach([2, 5, 10, 15, 30], id: \.self) { minutes in

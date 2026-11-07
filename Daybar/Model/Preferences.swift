@@ -52,6 +52,8 @@ final class Preferences {
     var secondTimeZoneID: String? { didSet { store(secondTimeZoneID, "secondTimeZoneID") } }
     var showMeetingIcon = true { didSet { store(showMeetingIcon, "showMeetingIcon") } }
     var meetingLeadMinutes = 10 { didSet { store(meetingLeadMinutes, "meetingLeadMinutes") } }
+    var showNextEvent = true { didSet { store(showNextEvent, "showNextEvent") } }
+    var nextEventMinutes = 60 { didSet { store(nextEventMinutes, "nextEventMinutes") } }
     var showDeclined = false { didSet { store(showDeclined, "showDeclined") } }
     var showReminders = true { didSet { store(showReminders, "showReminders") } }
     var defaultCalendarID: String? { didSet { store(defaultCalendarID, "defaultCalendarID") } }
@@ -72,7 +74,8 @@ final class Preferences {
 
     private static let keptKeys: Set<String> = ["calendarSets", "hasOnboarded"]
     private static let keys = [
-        "defaultView", "weekStart", "showWeekNumbers", "secondTimeZoneID", "showMeetingIcon", "meetingLeadMinutes", "showDeclined",
+        "defaultView", "weekStart", "showWeekNumbers", "secondTimeZoneID", "showMeetingIcon", "meetingLeadMinutes", "showNextEvent",
+        "nextEventMinutes", "showDeclined",
         "showReminders", "defaultCalendarID", "hiddenCalendarIDs", "calendarSets", "activeSetID", "showWeather", "useCurrentLocation",
         "weatherPlace", "compact", "showQuickAdd", "separateAllDay", "remindersByTime", "hasOnboarded", "panelHeight", "hiddenMeetingIDs",
     ]
@@ -98,6 +101,8 @@ final class Preferences {
         secondTimeZoneID = d.string(forKey: "secondTimeZoneID")
         showMeetingIcon = d.object(forKey: "showMeetingIcon") as? Bool ?? true
         meetingLeadMinutes = d.object(forKey: "meetingLeadMinutes") as? Int ?? 10
+        showNextEvent = d.object(forKey: "showNextEvent") as? Bool ?? true
+        nextEventMinutes = d.object(forKey: "nextEventMinutes") as? Int ?? 60
         showDeclined = d.bool(forKey: "showDeclined")
         showReminders = d.object(forKey: "showReminders") as? Bool ?? true
         defaultCalendarID = d.string(forKey: "defaultCalendarID")

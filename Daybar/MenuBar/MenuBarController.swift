@@ -50,17 +50,72 @@ final class MenuBarController: NSObject {
         meeting = upcomingMeeting(now: now)
         let live = meeting?.isLive(at: now) ?? false
         let service = meeting?.meeting?.service
-        let key = "\(now.dayNumber)|\(service?.name ?? "")|\(live)"
-        if key != renderedKey {
+        let next = nextEvent(now: now)
+        let label = next.map { countdown(for: $0, now: now) } ?? ""
+        let key = "\(now.dayNumber)|\(service?.name ?? "")|\(live)|\(label)"
+        if key != renderedKey, let button = item.button {
             renderedKey = key
-            item.button?.image = MenuBarIcon.item(day: now.dayNumber, meeting: service, live: live)
+            button.image = MenuBarIcon.item(day: now.dayNumber, meeting: service, live: live)
+            button.attributedTitle = NSAttributedString(string: label, attributes: [.font: Self.titleFont])
+            button.imagePosition = label.isEmpty ? .imageOnly : .imageLeading
         }
         var tip = Fmt.longDay(now)
+        if let next {
+            tip = "\(next.title)\n\(Fmt.timeRange(next.start, next.end))\n\n\(tip)"
+        }
         if let meeting, let link = meeting.meeting {
             tip = "\(L.joinTooltip(meeting.title, link.service.name))\n\(status(of: meeting, now: now))\n\n\(tip)"
         }
         item.button?.toolTip = tip
-        item.button?.setAccessibilityLabel(Fmt.longDay(now))
+        item.button?.setAccessibilityLabel(label.isEmpty ? Fmt.longDay(now) : "\(Fmt.longDay(now)), \(label)")
+    }
+
+    private static let titleFont: NSFont = {
+        let base = NSFont.menuBarFont(ofSize: 0)
+        let descriptor = base.fontDescriptor.addingAttributes([
+            .featureSettings: [
+                [NSFontDescriptor.FeatureKey.typeIdentifier: kNumberSpacingType, .selectorIdentifier: kMonospacedNumbersSelector]
+            ]
+        ])
+        return NSFont(descriptor: descriptor, size: base.pointSize) ?? base
+    }()
+
+    private func nextEvent(now: Date) -> Occurrence? {
+        _ = prefs.showNextEvent
+        _ = prefs.nextEventMinutes
+        guard prefs.showNextEvent else { return nil }
+        let horizon =
+            prefs.nextEventMinutes > 0 ? now.addingTimeInterval(TimeInterval(prefs.nextEventMinutes * 60)) : now.startOfDay.adding(days: 1)
+        var pool = store.occurrences(on: now)
+        pool.append(contentsOf: store.occurrences(on: now.adding(days: 1)))
+        var seen: Set<String> = []
+        let timed = pool.filter { occurrence in
+            !occurrence.isAllDay && !occurrence.isDeclined && occurrence.birthday == nil && occurrence.end > now
+                && occurrence.start < horizon
+                && seen.insert(occurrence.id).inserted
+        }
+        let upcoming = timed.filter { $0.start > now }.sorted { $0.start < $1.start }
+        let live = timed.filter { $0.start <= now }.max { $0.start < $1.start }
+        if let soon = upcoming.first, soon.start.timeIntervalSince(now) <= 5 * 60 { return soon }
+        return live ?? upcoming.first
+    }
+
+    private func countdown(for occurrence: Occurrence, now: Date) -> String {
+        let title = Self.truncated(occurrence.title, width: 150)
+        if occurrence.start > now {
+            return L.menuBarStartsIn(title, Fmt.duration(occurrence.start.timeIntervalSince(now)))
+        }
+        return L.menuBarTimeLeft(title, Fmt.duration(occurrence.end.timeIntervalSince(now)))
+    }
+
+    private static func truncated(_ text: String, width: CGFloat) -> String {
+        func measure(_ string: String) -> CGFloat { NSAttributedString(string: string, attributes: [.font: titleFont]).size().width }
+        guard measure(text) > width else { return text }
+        var characters = Array(text)
+        while !characters.isEmpty, measure(String(characters) + "…") > width {
+            characters.removeLast()
+        }
+        return String(characters).trimmingCharacters(in: .whitespaces) + "…"
     }
 
     private func upcomingMeeting(now: Date) -> Occurrence? {
@@ -100,8 +155,8 @@ final class MenuBarController: NSObject {
         let frame = window.convertToScreen(button.convert(button.bounds, to: nil))
         let mouse = NSEvent.mouseLocation
         guard frame.insetBy(dx: -2, dy: -4).contains(mouse) else { return nil }
-        let imageWidth = button.image?.size.width ?? frame.width
-        return mouse.x - frame.minX - (frame.width - imageWidth) / 2
+        let imageX = button.cell.map { $0.imageRect(forBounds: button.bounds).minX } ?? (frame.width - (button.image?.size.width ?? 0)) / 2
+        return mouse.x - frame.minX - imageX
     }
 
     private func showMeetingMenu(from button: NSStatusBarButton) {
