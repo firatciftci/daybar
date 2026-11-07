@@ -202,7 +202,12 @@ final class PanelModel {
     func delete(_ occurrence: Occurrence, span: EKSpan) {
         deleteRequest = nil
         guard let event = CalendarStore.shared.event(for: occurrence) else { return }
+        let snapshot = EventSnapshot(event)
+        let recurring = event.hasRecurrenceRules
         CalendarStore.shared.delete(event, span: span)
+        if !recurring || span == .thisEvent {
+            EventHistory.shared.deleted(snapshot, keepingRules: !recurring)
+        }
         if case .detail(let shown) = route, shown.id == occurrence.id {
             back()
         }
@@ -225,10 +230,20 @@ final class PanelModel {
         let store = CalendarStore.shared
         let event: EKEvent? = if let occurrence = draft.occurrence { store.event(for: occurrence) } else { store.newEvent() }
         guard let event else { return }
+        let before = draft.isNew ? nil : EventSnapshot(event)
+        let wasRecurring = event.hasRecurrenceRules
         draft.apply(to: event, store: store)
         guard store.save(event, span: span) else {
             NSSound.beep()
             return
+        }
+        if let before {
+            if !wasRecurring || span == .thisEvent {
+                EventHistory.shared.changed(
+                    event, from: before, message: L.historyEdited, rulesChanged: !wasRecurring && event.hasRecurrenceRules)
+            }
+        } else {
+            EventHistory.shared.added(event)
         }
         let saved = Occurrence(event)
         select(saved.start, scroll: true, animated: false)
@@ -292,6 +307,17 @@ final class PanelModel {
                 route = .detail(target)
             }
         }
+    }
+
+    func refreshShownEvent() {
+        guard case .detail(let shown) = route else { return }
+        guard let event = CalendarStore.shared.event(for: shown) else {
+            back()
+            return
+        }
+        var transaction = Transaction()
+        transaction.disablesAnimations = true
+        withTransaction(transaction) { route = .detail(Occurrence(event)) }
     }
 
     func back() {

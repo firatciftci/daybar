@@ -56,7 +56,37 @@ private struct MainPanel: View {
         }
         .animation(Motion.navigate, value: model.route)
         .overlay(alignment: .bottom) { ResizeHandle() }
+        .overlay(alignment: .bottom) { UndoToast() }
         .modifier(Confirmations())
+    }
+}
+
+private struct UndoToast: View {
+    private let history = EventHistory.shared
+
+    var body: some View {
+        ZStack {
+            if let notice = history.notice {
+                HStack(spacing: 12) {
+                    Text(notice.message)
+                        .font(.system(size: 12.5, weight: .medium))
+                        .foregroundStyle(.primary)
+                    Button(L.undoButton) { history.undo() }
+                        .buttonStyle(.plain)
+                        .font(.system(size: 12.5, weight: .semibold))
+                        .foregroundStyle(.tint)
+                }
+                .lineLimit(1)
+                .padding(.leading, 16)
+                .padding(.trailing, 14)
+                .frame(height: 34)
+                .glassEffect(.regular, in: .capsule)
+                .id(notice.id)
+                .transition(.offset(y: 12).combined(with: .opacity).combined(with: .scale(scale: 0.96)))
+            }
+        }
+        .animation(.smooth(duration: 0.3), value: history.notice)
+        .padding(.bottom, 18)
     }
 }
 

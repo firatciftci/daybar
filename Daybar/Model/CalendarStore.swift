@@ -187,20 +187,21 @@ final class CalendarStore {
     func complete(_ item: ReminderItem) {
         guard let reminder = ek.calendarItem(withIdentifier: item.id) as? EKReminder else { return }
         reminder.isCompleted = true
-        try? ek.save(reminder, commit: true)
+        guard (try? ek.save(reminder, commit: true)) != nil else { return }
         reload()
+        EventHistory.shared.reminderCompleted(item.id)
     }
 
     func event(for occurrence: Occurrence) -> EKEvent? {
-        let predicate = ek.predicateForEvents(
-            withStart: occurrence.start.addingTimeInterval(-60),
-            end: occurrence.end.addingTimeInterval(60),
-            calendars: nil
-        )
+        event(identifier: occurrence.eventIdentifier, start: occurrence.start)
+    }
+
+    func event(identifier: String, start: Date) -> EKEvent? {
+        let predicate = ek.predicateForEvents(withStart: start.addingTimeInterval(-60), end: start.addingTimeInterval(60), calendars: nil)
         let match = ek.events(matching: predicate).first {
-            ($0.eventIdentifier ?? $0.calendarItemIdentifier) == occurrence.eventIdentifier && $0.startDate == occurrence.start
+            ($0.eventIdentifier ?? $0.calendarItemIdentifier) == identifier && $0.startDate == start
         }
-        return match ?? ek.event(withIdentifier: occurrence.eventIdentifier)
+        return match ?? ek.event(withIdentifier: identifier)
     }
 
     func newEvent() -> EKEvent {
@@ -244,14 +245,19 @@ final class CalendarStore {
         for alarm in source.alarms ?? [] {
             copy.addAlarm(EKAlarm(relativeOffset: alarm.relativeOffset))
         }
-        return save(copy) ? copy : nil
+        guard save(copy) else { return nil }
+        EventHistory.shared.added(copy, message: L.historyDuplicated)
+        return copy
     }
 
     func move(_ occurrence: Occurrence, to start: Date, end: Date) {
         guard let event = event(for: occurrence) else { return }
+        let before = EventSnapshot(event)
         event.startDate = start
         event.endDate = end
-        save(event, span: .thisEvent)
+        if save(event, span: .thisEvent) {
+            EventHistory.shared.changed(event, from: before, message: L.historyMoved)
+        }
     }
 
     func add(_ entry: ParsedEntry) -> Bool {
@@ -270,6 +276,7 @@ final class CalendarStore {
             do {
                 try ek.save(reminder, commit: true)
                 reload()
+                EventHistory.shared.reminderAdded(reminder)
                 return true
             } catch {
                 return false
@@ -278,7 +285,9 @@ final class CalendarStore {
             let event = newEvent()
             entry.apply(to: event)
             if let calendar = entry.calendar { event.calendar = calendar }
-            return save(event)
+            guard save(event) else { return false }
+            EventHistory.shared.added(event)
+            return true
         }
     }
 

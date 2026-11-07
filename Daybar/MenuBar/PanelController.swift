@@ -7,6 +7,16 @@ final class DaybarPanel: NSPanel {
 
     override func performKeyEquivalent(with event: NSEvent) -> Bool {
         let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+        if flags == .command || flags == [.command, .shift], event.charactersIgnoringModifiers?.lowercased() == "z",
+            !(firstResponder is NSText)
+        {
+            if flags.contains(.shift) {
+                EventHistory.shared.redo()
+            } else {
+                EventHistory.shared.undo()
+            }
+            return true
+        }
         if flags == .command || flags == [.command, .shift], let key = event.charactersIgnoringModifiers?.lowercased() {
             let action: Selector? =
                 switch (key, flags.contains(.shift)) {
@@ -59,6 +69,7 @@ final class PanelController: NSObject, NSWindowDelegate {
         build()
         model.onDismiss = { [weak self] in self?.close() }
         model.onResize = { [weak self] phase in self?.resize(phase) }
+        EventHistory.shared.onApply = { [weak model] in model?.refreshShownEvent() }
         model.onOpenSettings = { [weak self] in
             self?.close()
             SettingsWindowController.shared.show()
