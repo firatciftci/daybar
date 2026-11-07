@@ -91,6 +91,10 @@ final class PanelController: NSObject, NSWindowDelegate {
             .environment(ContactsModel.shared)
         let host = NSHostingView(rootView: root)
         host.sizingOptions = []
+        host.wantsLayer = true
+        host.layer?.cornerRadius = glass.cornerRadius
+        host.layer?.cornerCurve = .continuous
+        host.layer?.masksToBounds = true
         glass.contentView = host
         panel.contentView = glass
     }
