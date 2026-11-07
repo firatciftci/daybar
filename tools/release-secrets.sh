@@ -273,7 +273,7 @@ note "The wizard deletes the file from your Desktop once it's uploaded."
 open -a "Keychain Access"
 step "In Keychain Access, choose login in the sidebar, then the My Certificates tab."
 step "Find \"$IDENTITY\"."
-step "Right-click it, choose Export, and save it to your Desktop as DaybarDeveloperID.p12."
+step "Select it, choose File > Export Items…, and save it to your Desktop as DaybarDeveloperID.p12 in .p12 format."
 step "Pick a password when asked, then enter your Mac password to allow the export."
 until [[ -f "$P12" ]]; do
   pause "Press Enter once DaybarDeveloperID.p12 is on your Desktop"
