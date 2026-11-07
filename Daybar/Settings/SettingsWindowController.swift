@@ -4,11 +4,20 @@ import KeyboardShortcuts
 import ServiceManagement
 import SwiftUI
 
-final class SettingsWindowController: NSWindowController {
+private final class SettingsTabs: NSTabViewController {
+    override func tabView(_ tabView: NSTabView, didSelect item: NSTabViewItem?) {
+        super.tabView(tabView, didSelect: item)
+        Task { [weak self] in self?.view.window?.makeFirstResponder(nil) }
+    }
+}
+
+final class SettingsWindowController: NSWindowController, NSWindowDelegate {
     static let shared = SettingsWindowController()
 
+    private var opening = false
+
     private init() {
-        let tabs = NSTabViewController()
+        let tabs = SettingsTabs()
         tabs.tabStyle = .toolbar
         tabs.canPropagateSelectedChildViewControllerTitle = true
         func add(_ title: String, symbol: String, _ pane: some View) {
@@ -38,6 +47,7 @@ final class SettingsWindowController: NSWindowController {
         window.toolbarStyle = .preference
         window.isReleasedWhenClosed = false
         super.init(window: window)
+        window.delegate = self
     }
 
     @available(*, unavailable)
@@ -46,7 +56,27 @@ final class SettingsWindowController: NSWindowController {
     func show() {
         guard let window else { return }
         if !window.isVisible { window.center() }
+        opening = true
         window.presentInFront()
+        clearFocus()
+        Task {
+            try? await Task.sleep(for: .milliseconds(800))
+            opening = false
+        }
+    }
+
+    func windowDidBecomeKey(_: Notification) {
+        if opening { clearFocus() }
+    }
+
+    private func clearFocus() {
+        Task { [weak self] in
+            guard let window = self?.window else { return }
+            if let event = NSApp.currentEvent, event.type == .leftMouseDown || event.type == .leftMouseUp, event.window === window {
+                return
+            }
+            window.makeFirstResponder(nil)
+        }
     }
 }
 
