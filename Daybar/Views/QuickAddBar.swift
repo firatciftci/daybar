@@ -135,23 +135,14 @@ private struct TokenHighlighter: NSViewRepresentable {
     }
 
     private static func paint(_ editor: NSTextView, _ colored: Array<(NSRange, NSColor)>) {
-        let length = editor.string.utf16.count
-        if let layout = editor.textLayoutManager, let content = layout.textContentManager {
-            let document = content.documentRange
-            layout.removeRenderingAttribute(.foregroundColor, for: document)
-            for (range, color) in colored where NSMaxRange(range) <= length {
-                guard let start = content.location(document.location, offsetBy: range.location),
-                    let end = content.location(start, offsetBy: range.length),
-                    let span = NSTextRange(location: start, end: end)
-                else { continue }
-                layout.addRenderingAttribute(.foregroundColor, value: color, for: span)
-            }
-        } else if let layout = editor.layoutManager {
-            layout.removeTemporaryAttribute(.foregroundColor, forCharacterRange: NSRange(location: 0, length: length))
-            for (range, color) in colored where NSMaxRange(range) <= length {
-                layout.addTemporaryAttribute(.foregroundColor, value: color, forCharacterRange: range)
-            }
+        guard let storage = editor.textStorage else { return }
+        storage.beginEditing()
+        storage.addAttribute(.foregroundColor, value: NSColor.labelColor, range: NSRange(location: 0, length: storage.length))
+        for (range, color) in colored where NSMaxRange(range) <= storage.length {
+            storage.addAttribute(.foregroundColor, value: color, range: range)
         }
+        storage.endEditing()
+        editor.typingAttributes[.foregroundColor] = NSColor.labelColor
     }
 }
 
