@@ -107,6 +107,10 @@ final class PanelController: NSObject, NSWindowDelegate {
         host.layer?.cornerCurve = .continuous
         host.layer?.masksToBounds = true
         glass.contentView = host
+        glass.wantsLayer = true
+        glass.layer?.cornerRadius = glass.cornerRadius
+        glass.layer?.cornerCurve = .continuous
+        glass.layer?.masksToBounds = true
         panel.contentView = glass
     }
 
@@ -157,7 +161,10 @@ final class PanelController: NSObject, NSWindowDelegate {
                 panel.animator().setFrame(finalFrame, display: true)
             }
         } completionHandler: {
-            MainActor.assumeIsolated { self.isPositioning = false }
+            MainActor.assumeIsolated {
+                self.isPositioning = false
+                self.panel.invalidateShadow()
+            }
         }
         installMonitors()
         onVisibilityChange?(true)
