@@ -16,7 +16,12 @@ nonisolated enum ContactKey: Hashable, Sendable {
     case identifier(String)
     case email(String)
     case name(String)
+    case participant(String)
     case me
+}
+
+private nonisolated struct PredicateBox: @unchecked Sendable {
+    let predicate: NSPredicate
 }
 
 @Observable
@@ -26,6 +31,7 @@ final class ContactsModel {
     private(set) var cards: [ContactKey: ContactCard] = [:]
     @ObservationIgnored private var pending: Set<ContactKey> = []
     @ObservationIgnored private var misses: Set<ContactKey> = []
+    @ObservationIgnored private var predicates: [String: NSPredicate] = [:]
     @ObservationIgnored private var access: Task<Bool, Never>?
     @ObservationIgnored private var observer: (any NSObjectProtocol)?
 
@@ -37,13 +43,13 @@ final class ContactsModel {
 
     func card(for keys: Array<ContactKey>) -> ContactCard? {
         guard ![.denied, .restricted].contains(CNContactStore.authorizationStatus(for: .contacts)) else { return nil }
-        for key in keys {
-            if let card = cards[key] { return card }
+        if let card = keys.lazy.compactMap({ self.cards[$0] }).first(where: { $0.thumbnail != nil }) {
+            return card
         }
-        for key in keys where !misses.contains(key) && !pending.contains(key) {
+        for key in keys where cards[key] == nil && !misses.contains(key) && !pending.contains(key) {
             load(key)
         }
-        return nil
+        return keys.lazy.compactMap { self.cards[$0] }.first
     }
 
     func card(forBirthday birthday: Birthday) -> ContactCard? {
@@ -56,6 +62,9 @@ final class ContactsModel {
     func card(for participant: EKParticipant, email: String?, name: String?) -> ContactCard? {
         var keys: Array<ContactKey> = []
         if participant.isCurrentUser { keys.append(.me) }
+        let url = participant.url.absoluteString
+        predicates[url] = participant.contactPredicate
+        keys.append(.participant(url))
         if let email, !email.isEmpty { keys.append(.email(email.lowercased())) }
         if let name, !name.isEmpty { keys.append(.name(name)) }
         return card(for: keys)
@@ -64,6 +73,7 @@ final class ContactsModel {
     func reset() {
         cards = [:]
         misses = []
+        predicates = [:]
     }
 
     private func load(_ key: ContactKey) {
@@ -73,7 +83,9 @@ final class ContactsModel {
                 pending.remove(key)
                 return
             }
-            let card = await Task.detached(priority: .utility) { Self.fetch(key) }.value
+            let predicate: PredicateBox? =
+                if case .participant(let url) = key { predicates[url].map(PredicateBox.init) } else { nil }
+            let card = await Task.detached(priority: .utility) { Self.fetch(key, predicate: predicate) }.value
             pending.remove(key)
             if let card {
                 cards[key] = card
@@ -96,13 +108,13 @@ final class ContactsModel {
         }
     }
 
-    nonisolated private static func fetch(_ key: ContactKey) -> ContactCard? {
+    nonisolated private static func fetch(_ key: ContactKey, predicate: PredicateBox?) -> ContactCard? {
         let store = CNContactStore()
         let keys: Array<any CNKeyDescriptor> = [
             CNContactFormatter.descriptorForRequiredKeys(for: .fullName),
+            CNContactNicknameKey as any CNKeyDescriptor,
             CNContactThumbnailImageDataKey as any CNKeyDescriptor,
             CNContactImageDataKey as any CNKeyDescriptor,
-            CNContactImageDataAvailableKey as any CNKeyDescriptor,
         ]
         let matches: Array<CNContact> =
             switch key {
@@ -111,16 +123,43 @@ final class ContactsModel {
             case .email(let email):
                 (try? store.unifiedContacts(matching: CNContact.predicateForContacts(matchingEmailAddress: email), keysToFetch: keys)) ?? []
             case .name(let name):
-                (try? store.unifiedContacts(matching: CNContact.predicateForContacts(matchingName: name), keysToFetch: keys)) ?? []
+                nameMatches(name, in: store, keys: keys)
+            case .participant:
+                predicate.flatMap { try? store.unifiedContacts(matching: $0.predicate, keysToFetch: keys) } ?? []
             case .me:
                 (try? store.unifiedMeContactWithKeys(toFetch: keys)).map { [$0] } ?? []
             }
-        guard let contact = matches.first(where: \.imageDataAvailable) ?? matches.first else { return nil }
+        let photographed = matches.lazy.compactMap { contact in photo(of: contact).map { (contact, $0) } }.first
+        guard let contact = photographed?.0 ?? matches.first else { return nil }
         return ContactCard(
             identifier: contact.identifier,
             name: CNContactFormatter.string(from: contact, style: .fullName),
-            thumbnail: contact.imageDataAvailable ? contact.thumbnailImageData ?? contact.imageData.flatMap(downscaled) : nil
+            thumbnail: photographed?.1
         )
+    }
+
+    nonisolated private static func nameMatches(
+        _ raw: String, in store: CNContactStore, keys: Array<any CNKeyDescriptor>
+    ) -> Array<CNContact> {
+        let parts = raw.split(separator: ",", maxSplits: 1).map { $0.trimmingCharacters(in: .whitespaces) }
+        let name = parts.count == 2 ? "\(parts[1]) \(parts[0])" : raw
+        let exact = (try? store.unifiedContacts(matching: CNContact.predicateForContacts(matchingName: name), keysToFetch: keys)) ?? []
+        if !exact.isEmpty { return exact }
+        let tokens = name.split(whereSeparator: \.isWhitespace).map(String.init)
+        guard let first = tokens.first, tokens.count > 1 else { return [] }
+        let candidates =
+            (try? store.unifiedContacts(matching: CNContact.predicateForContacts(matchingName: first), keysToFetch: keys)) ?? []
+        let rest = Set(tokens.dropFirst().map { $0.lowercased() })
+        let given = candidates.filter { $0.givenName.caseInsensitiveCompare(first) == .orderedSame }
+        let strong = given.filter { rest.contains($0.familyName.lowercased()) || rest.contains($0.nickname.lowercased()) }
+        if !strong.isEmpty { return strong }
+        let loose = given.filter(\.familyName.isEmpty)
+        return loose.count == 1 ? loose : []
+    }
+
+    nonisolated private static func photo(of contact: CNContact) -> Data? {
+        guard let data = contact.thumbnailImageData ?? contact.imageData, !data.isEmpty else { return nil }
+        return data.count > 48_000 ? downscaled(data) ?? data : data
     }
 
     nonisolated private static func downscaled(_ data: Data) -> Data? {
