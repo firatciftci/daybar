@@ -84,6 +84,10 @@ final class WeatherModel: NSObject, CLLocationManagerDelegate {
             forecasts = [:]
             return
         }
+        if DemoData.isEnabled {
+            forecasts = DemoData.forecasts()
+            return
+        }
         if !force, let lastFetch, Date().timeIntervalSince(lastFetch) < 3_600, !forecasts.isEmpty {
             return
         }

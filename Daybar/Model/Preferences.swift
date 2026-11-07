@@ -44,7 +44,7 @@ struct WeatherPlace: Codable, Hashable {
 final class Preferences {
     static let shared = Preferences()
 
-    @ObservationIgnored private let defaults = UserDefaults.standard
+    @ObservationIgnored private let defaults = DemoData.isEnabled ? DemoData.defaults : .standard
 
     var defaultView = PanelMode.month { didSet { store(defaultView.rawValue, "defaultView") } }
     var weekStart = 0 { didSet { store(weekStart, "weekStart") } }

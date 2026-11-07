@@ -128,7 +128,7 @@ struct EventDraft: Equatable {
             event.startDate = start
             event.endDate = max(end, start)
         }
-        if let calendar = store.ek.calendar(withIdentifier: calendarID) {
+        if let calendar = store.calendar(withIdentifier: calendarID) {
             event.calendar = calendar
         }
         if recurrence != recurrenceBaseline || (recurrence == .custom && repeatRule != repeatBaseline) {

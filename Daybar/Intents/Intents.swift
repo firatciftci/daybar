@@ -121,7 +121,7 @@ struct AddEventIntent: AppIntent {
             event.endDate = max(end ?? start.addingTimeInterval(3_600), start)
         }
         event.location = location
-        if let calendar, let found = store.ek.calendar(withIdentifier: calendar.id), found.allowsContentModifications {
+        if let calendar, let found = store.calendar(withIdentifier: calendar.id), found.allowsContentModifications {
             event.calendar = found
         }
         guard store.save(event) else { throw DaybarIntentError.saveFailed }

@@ -42,7 +42,7 @@ final class ContactsModel {
     }
 
     func card(for keys: Array<ContactKey>) -> ContactCard? {
-        guard ![.denied, .restricted].contains(CNContactStore.authorizationStatus(for: .contacts)) else { return nil }
+        guard !DemoData.isEnabled, ![.denied, .restricted].contains(CNContactStore.authorizationStatus(for: .contacts)) else { return nil }
         if let card = keys.lazy.compactMap({ self.cards[$0] }).first(where: { $0.thumbnail != nil }) {
             return card
         }

@@ -41,7 +41,7 @@ struct EventSnapshot {
         event.notes = notes
         event.url = url
         event.availability = availability
-        if let calendarID, let calendar = store.ek.calendar(withIdentifier: calendarID), calendar.allowsContentModifications {
+        if let calendarID, let calendar = store.calendar(withIdentifier: calendarID), calendar.allowsContentModifications {
             event.calendar = calendar
         } else if event.calendar == nil {
             event.calendar = store.defaultCalendar
@@ -171,8 +171,8 @@ final class EventHistory {
         let due = reminder.dueDateComponents
         let alarms = (reminder.alarms ?? []).compactMap { $0.copy() as? EKAlarm }
         record(L.historyReminderAdded) { [weak self] in
-            guard let self, let item = store.ek.calendarItem(withIdentifier: identifier) as? EKReminder else { return }
-            try? store.ek.remove(item, commit: true)
+            guard let self, let item = store.item(withIdentifier: identifier) as? EKReminder else { return }
+            try? store.discard(item)
             store.reload()
         } redo: { [weak self] in
             guard let self else { return }
@@ -183,7 +183,7 @@ final class EventHistory {
             for alarm in alarms {
                 if let copy = alarm.copy() as? EKAlarm { item.addAlarm(copy) }
             }
-            try? store.ek.save(item, commit: true)
+            try? store.commit(item)
             identifier = item.calendarItemIdentifier
             store.reload()
         }
@@ -233,9 +233,9 @@ final class EventHistory {
     }
 
     private func setCompleted(_ identifier: String, _ completed: Bool) {
-        guard let reminder = store.ek.calendarItem(withIdentifier: identifier) as? EKReminder else { return }
+        guard let reminder = store.item(withIdentifier: identifier) as? EKReminder else { return }
         reminder.isCompleted = completed
-        try? store.ek.save(reminder, commit: true)
+        try? store.commit(reminder)
         store.reload()
     }
 }

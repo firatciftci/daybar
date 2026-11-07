@@ -13,6 +13,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_: Notification) {
         NSApp.mainMenu = Self.makeMainMenu()
+        if let appearance = DemoData.appearance { NSApp.appearance = NSAppearance(named: appearance) }
         let panel = PanelController()
         let menuBar = MenuBarController(panel: panel)
         self.panel = panel
@@ -21,7 +22,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             menuBar?.togglePanel()
         }
         WeatherModel.shared.refresh()
-        IntentSupport.start()
+        if !DemoData.isEnabled { IntentSupport.start() }
         Timer.scheduledTimer(withTimeInterval: 1_800, repeats: true) { _ in
             MainActor.assumeIsolated { WeatherModel.shared.refresh() }
         }

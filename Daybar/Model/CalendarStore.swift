@@ -14,6 +14,7 @@ final class CalendarStore {
 
     @ObservationIgnored let ek = EKEventStore()
     @ObservationIgnored private let prefs = Preferences.shared
+    @ObservationIgnored private lazy var demo = DemoData.isEnabled ? DemoData(store: ek) : nil
 
     private(set) var access: AccessState = .unknown
     private(set) var remindersGranted = false
@@ -39,6 +40,12 @@ final class CalendarStore {
     }
 
     func refreshAccess() {
+        if demo != nil {
+            access = .granted
+            remindersGranted = true
+            reload()
+            return
+        }
         switch EKEventStore.authorizationStatus(for: .event) {
         case .fullAccess: access = .granted
         case .notDetermined: access = .unknown
@@ -76,25 +83,47 @@ final class CalendarStore {
     }
 
     var defaultCalendar: EKCalendar? {
-        if let id = prefs.defaultCalendarID, let calendar = ek.calendar(withIdentifier: id), calendar.allowsContentModifications {
+        if let id = prefs.defaultCalendarID, let calendar = calendar(withIdentifier: id), calendar.allowsContentModifications {
             return calendar
         }
+        if let demo { return demo.calendars.first }
         return ek.defaultCalendarForNewEvents ?? writableCalendars.first
     }
 
     var defaultReminderList: EKCalendar? {
-        ek.defaultCalendarForNewReminders()
+        demo.map(\.lists.first) ?? ek.defaultCalendarForNewReminders()
+    }
+
+    func calendar(withIdentifier identifier: String) -> EKCalendar? {
+        demo.map { $0.calendar(withIdentifier: identifier) } ?? ek.calendar(withIdentifier: identifier)
+    }
+
+    func item(withIdentifier identifier: String) -> EKCalendarItem? {
+        demo.map { $0.item(withIdentifier: identifier) } ?? ek.calendarItem(withIdentifier: identifier)
+    }
+
+    func commit(_ reminder: EKReminder) throws {
+        if let demo { demo.insert(reminder) } else { try ek.save(reminder, commit: true) }
+    }
+
+    func discard(_ reminder: EKReminder) throws {
+        if let demo { demo.remove(reminder) } else { try ek.remove(reminder, commit: true) }
     }
 
     func reload() {
         guard access == .granted else { return }
-        eventCalendars = ek.calendars(for: .event).sorted { $0.title.localizedStandardCompare($1.title) == .orderedAscending }
-        reminderCalendars = remindersGranted ? ek.calendars(for: .reminder) : []
+        eventCalendars = (demo?.calendars ?? ek.calendars(for: .event)).sorted {
+            $0.title.localizedStandardCompare($1.title) == .orderedAscending
+        }
+        reminderCalendars = demo?.lists ?? (remindersGranted ? ek.calendars(for: .reminder) : [])
         let visible = visibleCalendars
         var map: [Date: Array<Occurrence>] = [:]
         if !visible.isEmpty {
-            let predicate = ek.predicateForEvents(withStart: range.start, end: range.end, calendars: visible)
-            for event in ek.events(matching: predicate) {
+            let ids = Set(visible.map(\.calendarIdentifier))
+            let events =
+                demo?.events.filter { ids.contains($0.calendar.calendarIdentifier) }
+                ?? ek.events(matching: ek.predicateForEvents(withStart: range.start, end: range.end, calendars: visible))
+            for event in events {
                 let occurrence = Occurrence(event)
                 if occurrence.isDeclined, !prefs.showDeclined { continue }
                 for day in occurrence.spannedDays {
@@ -158,6 +187,10 @@ final class CalendarStore {
             overdueReminders = []
             return
         }
+        if let demo {
+            apply(demo.reminders.filter { !$0.isCompleted }.compactMap(ReminderItem.init))
+            return
+        }
         let predicate = ek.predicateForIncompleteReminders(withDueDateStarting: nil, ending: range.end, calendars: nil)
         ek.fetchReminders(matching: predicate) { @Sendable [weak self] found in
             let items = (found ?? []).compactMap(ReminderItem.init)
@@ -185,9 +218,9 @@ final class CalendarStore {
     }
 
     func complete(_ item: ReminderItem) {
-        guard let reminder = ek.calendarItem(withIdentifier: item.id) as? EKReminder else { return }
+        guard let reminder = self.item(withIdentifier: item.id) as? EKReminder else { return }
         reminder.isCompleted = true
-        guard (try? ek.save(reminder, commit: true)) != nil else { return }
+        guard (try? commit(reminder)) != nil else { return }
         reload()
         EventHistory.shared.reminderCompleted(item.id)
     }
@@ -197,6 +230,10 @@ final class CalendarStore {
     }
 
     func event(identifier: String, start: Date) -> EKEvent? {
+        if let demo {
+            return demo.events.first { $0.calendarItemIdentifier == identifier && $0.startDate == start }
+                ?? demo.item(withIdentifier: identifier) as? EKEvent
+        }
         let predicate = ek.predicateForEvents(withStart: start.addingTimeInterval(-60), end: start.addingTimeInterval(60), calendars: nil)
         let match = ek.events(matching: predicate).first {
             ($0.eventIdentifier ?? $0.calendarItemIdentifier) == identifier && $0.startDate == start
@@ -213,7 +250,7 @@ final class CalendarStore {
     @discardableResult
     func save(_ event: EKEvent, span: EKSpan = .thisEvent) -> Bool {
         do {
-            try ek.save(event, span: span, commit: true)
+            if let demo { demo.insert(event) } else { try ek.save(event, span: span, commit: true) }
             reload()
             return true
         } catch {
@@ -224,7 +261,7 @@ final class CalendarStore {
 
     func delete(_ event: EKEvent, span: EKSpan = .thisEvent) {
         do {
-            try ek.remove(event, span: span, commit: true)
+            if let demo { demo.remove(event) } else { try ek.remove(event, span: span, commit: true) }
             reload()
         } catch {
             NSSound.beep()
@@ -274,7 +311,7 @@ final class CalendarStore {
                 if entry.hasTime { reminder.addAlarm(EKAlarm(absoluteDate: start)) }
             }
             do {
-                try ek.save(reminder, commit: true)
+                try commit(reminder)
                 reload()
                 EventHistory.shared.reminderAdded(reminder)
                 return true
