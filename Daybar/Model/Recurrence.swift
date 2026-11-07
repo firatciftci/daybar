@@ -143,7 +143,7 @@ enum AlertOffset {
     }
 
     static func relative(_ alarms: Array<EKAlarm>?) -> Array<EKAlarm> {
-        (alarms ?? []).filter { $0.absoluteDate == nil && $0.structuredLocation == nil }
+        (alarms ?? []).filter { $0.absoluteDate == nil && $0.structuredLocation == nil }.sorted { $0.relativeOffset > $1.relativeOffset }
     }
 
     static func options(including current: Int?, allDay: Bool) -> Array<Int> {
