@@ -1,6 +1,20 @@
 import EventKit
 import Foundation
 
+struct ParsedSpan: Equatable {
+    enum Role {
+        case kind
+        case calendar
+        case when
+        case place
+        case repeats
+        case alert
+    }
+
+    let role: Role
+    let range: NSRange
+}
+
 struct ParsedEntry {
     enum Kind {
         case event
@@ -18,6 +32,7 @@ struct ParsedEntry {
     var reminderList: EKCalendar?
     var alertMinutes: Int?
     var recurrence: EKRecurrenceFrequency?
+    var spans: Array<ParsedSpan> = []
 
     var isEmpty: Bool { title.isEmpty }
 
@@ -64,15 +79,20 @@ enum EntryParser {
 
     static func parse(_ raw: String, calendars: Array<EKCalendar>, reminderLists: Array<EKCalendar>, now: Date = .now) -> ParsedEntry {
         var entry = ParsedEntry()
-        var text = raw.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !text.isEmpty else { return entry }
+        var source = TrackedText(raw)
+        guard !source.text.isEmpty else { return entry }
 
-        if let match = first(reminderPrefix, in: text) {
-            entry.kind = .reminder
-            text = remove(match.range, from: text)
+        func consume(_ range: NSRange, as role: ParsedSpan.Role?, highlight: NSRange? = nil) {
+            if let role { entry.spans.append(ParsedSpan(role: role, range: source.original(highlight ?? range))) }
+            source.replace(range, with: " ")
         }
 
-        if let match = first(calendarTag, in: text), let token = substring(match.range(at: 1), in: text) {
+        if let match = first(reminderPrefix, in: source.text) {
+            entry.kind = .reminder
+            consume(match.range, as: .kind)
+        }
+
+        if let match = first(calendarTag, in: source.text), let token = substring(match.range(at: 1), in: source.text) {
             let needle = token.lowercased()
             let pool = entry.kind == .reminder ? reminderLists : calendars.filter(\.allowsContentModifications)
             let found =
@@ -80,36 +100,46 @@ enum EntryParser {
                 ?? pool.first { $0.title.lowercased().replacingOccurrences(of: " ", with: "").hasPrefix(needle) }
             if let found {
                 if entry.kind == .reminder { entry.reminderList = found } else { entry.calendar = found }
-                text = remove(match.range, from: text)
+                let tag = NSRange(location: match.range(at: 1).location - 1, length: match.range(at: 1).length + 1)
+                consume(match.range, as: .calendar, highlight: tag)
             }
         }
 
-        if let match = first(alertPattern, in: text),
-            let amount = substring(match.range(at: 1), in: text).flatMap(Int.init),
-            let unit = substring(match.range(at: 2), in: text)?.lowercased()
+        if let match = first(alertPattern, in: source.text),
+            let amount = substring(match.range(at: 1), in: source.text).flatMap(Int.init),
+            let unit = substring(match.range(at: 2), in: source.text)?.lowercased()
         {
             entry.alertMinutes = unit.hasPrefix("h") ? amount * 60 : amount
-            text = remove(match.range, from: text)
+            consume(match.range, as: .alert)
         }
 
-        if let match = first(everyWeekday, in: text), let day = substring(match.range(at: 1), in: text) {
+        var weekday: String?
+        if let match = first(everyWeekday, in: source.text), let day = substring(match.range(at: 1), in: source.text) {
+            weekday = day
             entry.recurrence = .weekly
-            text = replace(match.range, in: text, with: "on \(day)")
-        } else if let match = first(recurrencePattern, in: text), let word = substring(match.range(at: 1), in: text)?.lowercased() {
+            entry.spans.append(ParsedSpan(role: .repeats, range: source.original(match.range)))
+            source.replace(match.range, with: "on \(day)")
+        } else if let match = first(recurrencePattern, in: source.text),
+            let word = substring(match.range(at: 1), in: source.text)?.lowercased()
+        {
             entry.recurrence = recurrence(for: word)
-            text = remove(match.range, from: text)
+            consume(match.range, as: .repeats)
         }
 
         var explicitDuration: TimeInterval?
-        if let match = first(durationPattern, in: text),
-            let amount = substring(match.range(at: 1), in: text).flatMap(Double.init),
-            let unit = substring(match.range(at: 2), in: text)?.lowercased()
+        if let match = first(durationPattern, in: source.text),
+            let amount = substring(match.range(at: 1), in: source.text).flatMap(Double.init),
+            let unit = substring(match.range(at: 2), in: source.text)?.lowercased()
         {
             explicitDuration = unit.hasPrefix("h") ? amount * 3_600 : amount * 60
-            text = remove(match.range, from: text)
+            consume(match.range, as: .when)
         }
 
-        applyDate(to: &entry, text: &text, explicitDuration: explicitDuration)
+        applyDate(to: &entry, source: &source, explicitDuration: explicitDuration)
+
+        if let weekday, let match = first(regex(#"\s*\bon\s+"# + weekday + #"\b"#), in: source.text) {
+            consume(match.range, as: nil)
+        }
 
         if entry.start == nil, entry.kind == .event {
             let begin = nextSlot(after: now)
@@ -118,21 +148,37 @@ enum EntryParser {
             entry.hasTime = true
         }
 
-        if let match = first(locationPattern, in: text), let place = substring(match.range(at: 1), in: text) {
-            entry.location = place.trimmingCharacters(in: .whitespaces)
-            text = remove(match.range, from: text)
+        if let match = first(locationPattern, in: source.text), let place = substring(match.range(at: 1), in: source.text) {
+            let trimmed = place.trimmingCharacters(in: .whitespaces)
+            entry.location = trimmed
+            let placeRange = NSRange(location: match.range(at: 1).location, length: trimmed.utf16.count)
+            consume(match.range, as: .place, highlight: placeRange)
         }
 
-        while let match = first(danglingWords, in: text) {
-            text = remove(match.range, from: text)
+        while let match = first(danglingWords, in: source.text) {
+            consume(match.range, as: nil)
         }
 
         entry.title =
-            text
+            source.text
             .split(whereSeparator: \.isWhitespace)
             .joined(separator: " ")
             .trimmingCharacters(in: CharacterSet(charactersIn: " ,;-"))
+        entry.spans = disjoint(entry.spans)
         return entry
+    }
+
+    private static func disjoint(_ spans: Array<ParsedSpan>) -> Array<ParsedSpan> {
+        var result: Array<ParsedSpan> = []
+        var claimed = IndexSet()
+        for span in spans {
+            let free = IndexSet(integersIn: Range(span.range) ?? 0..<0).subtracting(claimed)
+            for run in free.rangeView where !run.isEmpty {
+                result.append(ParsedSpan(role: span.role, range: NSRange(run)))
+            }
+            claimed.formUnion(free)
+        }
+        return result.sorted { $0.range.location < $1.range.location }
     }
 
     private static func recurrence(for word: String) -> EKRecurrenceFrequency {
@@ -142,7 +188,8 @@ enum EntryParser {
         return .yearly
     }
 
-    private static func applyDate(to entry: inout ParsedEntry, text: inout String, explicitDuration: TimeInterval?) {
+    private static func applyDate(to entry: inout ParsedEntry, source: inout TrackedText, explicitDuration: TimeInterval?) {
+        let text = source.text
         guard let detector,
             let match = detector.matches(in: text, options: [], range: NSRange(text.startIndex..., in: text)).first,
             let date = match.date,
@@ -160,7 +207,8 @@ enum EntryParser {
             let length = max(1, Int(((explicitDuration ?? 0) / 86_400).rounded(.up)))
             entry.end = Calendar.current.date(byAdding: .day, value: length, to: day)
         }
-        text = remove(withPreposition(match.range, in: text), from: text)
+        entry.spans.append(ParsedSpan(role: .when, range: source.original(match.range)))
+        source.replace(withPreposition(match.range, in: text), with: " ")
     }
 
     private static func first(_ regex: NSRegularExpression?, in text: String) -> NSTextCheckingResult? {
@@ -178,15 +226,31 @@ enum EntryParser {
         guard let match = first(leadingPreposition, in: prefix) else { return range }
         return NSRange(location: match.range.location, length: NSMaxRange(range) - match.range.location)
     }
+}
 
-    private static func remove(_ range: NSRange, from text: String) -> String {
-        replace(range, in: text, with: " ")
+private struct TrackedText {
+    private(set) var text: String
+    private var origin: Array<Int>
+
+    init(_ raw: String) {
+        let leading = raw.prefix(while: \.isWhitespace).utf16.count
+        text = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        origin = Array(leading..<(leading + text.utf16.count))
     }
 
-    private static func replace(_ range: NSRange, in text: String, with replacement: String) -> String {
-        guard let swiftRange = Range(range, in: text) else { return text }
-        var copy = text
-        copy.replaceSubrange(swiftRange, with: replacement)
-        return copy
+    mutating func replace(_ range: NSRange, with replacement: String) {
+        guard let swiftRange = Range(range, in: text), range.length > 0, NSMaxRange(range) <= origin.count else { return }
+        let first = origin[range.location]
+        let last = origin[NSMaxRange(range) - 1]
+        let count = replacement.utf16.count
+        let mapped = (0..<count).map { index in first + (count > 1 ? index * (last - first) / (count - 1) : 0) }
+        text.replaceSubrange(swiftRange, with: replacement)
+        origin.replaceSubrange(range.location..<NSMaxRange(range), with: mapped)
+    }
+
+    func original(_ range: NSRange) -> NSRange {
+        guard range.length > 0, range.location >= 0, NSMaxRange(range) <= origin.count else { return range }
+        let start = origin[range.location]
+        return NSRange(location: start, length: origin[NSMaxRange(range) - 1] + 1 - start)
     }
 }

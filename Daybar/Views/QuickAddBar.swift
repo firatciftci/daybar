@@ -35,6 +35,14 @@ struct QuickAddBar: View {
                     .textFieldStyle(.plain)
                     .font(.system(size: 13))
                     .focused($focused)
+                    .background {
+                        TokenHighlighter(
+                            text: model.quickAddText,
+                            spans: entry.spans,
+                            calendarColor: (entry.calendar ?? entry.reminderList).flatMap { NSColor(cgColor: $0.cgColor) },
+                            active: focused
+                        )
+                    }
                     .onSubmit(commit)
                     .onChange(of: focused) { _, isFocused in
                         if isFocused, model.quickAddText.isEmpty, !isUserInitiated { focused = false }
@@ -91,6 +99,58 @@ struct QuickAddBar: View {
             }
         } else {
             NSSound.beep()
+        }
+    }
+}
+
+private struct TokenHighlighter: NSViewRepresentable {
+    let text: String
+    let spans: Array<ParsedSpan>
+    let calendarColor: NSColor?
+    let active: Bool
+
+    func makeNSView(context _: Context) -> NSView { NSView() }
+
+    func updateNSView(_ view: NSView, context _: Context) {
+        guard active else { return }
+        let text = text
+        let colored = spans.map { ($0.range, color(for: $0.role)) }
+        DispatchQueue.main.async {
+            guard let editor = view.window?.firstResponder as? NSTextView, editor.isFieldEditor, editor.string == text,
+                !editor.hasMarkedText()
+            else { return }
+            Self.paint(editor, colored)
+        }
+    }
+
+    private func color(for role: ParsedSpan.Role) -> NSColor {
+        switch role {
+        case .kind: .systemGreen
+        case .calendar: calendarColor ?? .controlAccentColor
+        case .when: .controlAccentColor
+        case .place: .systemOrange
+        case .repeats: .systemPurple
+        case .alert: .systemPink
+        }
+    }
+
+    private static func paint(_ editor: NSTextView, _ colored: Array<(NSRange, NSColor)>) {
+        let length = editor.string.utf16.count
+        if let layout = editor.textLayoutManager, let content = layout.textContentManager {
+            let document = content.documentRange
+            layout.removeRenderingAttribute(.foregroundColor, for: document)
+            for (range, color) in colored where NSMaxRange(range) <= length {
+                guard let start = content.location(document.location, offsetBy: range.location),
+                    let end = content.location(start, offsetBy: range.length),
+                    let span = NSTextRange(location: start, end: end)
+                else { continue }
+                layout.addRenderingAttribute(.foregroundColor, value: color, for: span)
+            }
+        } else if let layout = editor.layoutManager {
+            layout.removeTemporaryAttribute(.foregroundColor, forCharacterRange: NSRange(location: 0, length: length))
+            for (range, color) in colored where NSMaxRange(range) <= length {
+                layout.addTemporaryAttribute(.foregroundColor, value: color, forCharacterRange: range)
+            }
         }
     }
 }
