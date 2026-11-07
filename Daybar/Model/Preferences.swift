@@ -57,6 +57,7 @@ final class Preferences {
     var showDeclined = false { didSet { store(showDeclined, "showDeclined") } }
     var showReminders = true { didSet { store(showReminders, "showReminders") } }
     var defaultCalendarID: String? { didSet { store(defaultCalendarID, "defaultCalendarID") } }
+    var focusCalendarIDs: Set<String>?
     var hiddenCalendarIDs: Set<String> = [] { didSet { encode(hiddenCalendarIDs, "hiddenCalendarIDs") } }
     var calendarSets: Array<CalendarSet> = [] { didSet { encode(calendarSets, "calendarSets") } }
     var activeSetID: UUID? { didSet { store(activeSetID?.uuidString, "activeSetID") } }
@@ -130,6 +131,7 @@ final class Preferences {
     }
 
     func isCalendarVisible(_ id: String) -> Bool {
+        if let focusCalendarIDs { return focusCalendarIDs.contains(id) }
         if let activeSet { return activeSet.calendarIDs.contains(id) }
         return !hiddenCalendarIDs.contains(id)
     }

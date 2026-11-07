@@ -21,6 +21,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             menuBar?.togglePanel()
         }
         WeatherModel.shared.refresh()
+        IntentSupport.start()
         Timer.scheduledTimer(withTimeInterval: 1_800, repeats: true) { _ in
             MainActor.assumeIsolated { WeatherModel.shared.refresh() }
         }
