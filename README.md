@@ -19,14 +19,17 @@ Daybar puts today's date in your menu bar. Click it to see your month, week, or 
 ## Features
 
 - Four views. Switch between a month grid, a week strip, a day timeline, and an Up next list that shows what's happening now and your free time around it.
-- Quick add in plain words. Type "Coffee with Ana Friday 9am at Blue Bottle /work" and Daybar fills in the time, place, and calendar.
+- Next event in the menu bar. The title of your next event and a countdown sit next to the date, then switch to the time left once it starts.
+- Quick add in plain words. Type "Coffee with Ana Friday 9am at Blue Bottle /work" and Daybar fills in the time, place, and calendar, coloring each part as it recognizes it.
 - Join calls from the menu bar. When a Zoom, Teams, Meet, Webex, or FaceTime call is about to start, an icon appears next to the date. Click it to join.
-- Edit without leaving the panel. Create, edit, duplicate, and delete events, including repeating ones, with the calendar still in view.
+- Edit without leaving the panel. Create, edit, duplicate, and delete events, including repeating ones, with the calendar still in view. Set custom repeats like every other Tuesday and Thursday, and add more than one alert.
+- Undo. Take back an add, edit, move, or delete with the Undo button that appears after each change, or with ⌘Z.
 - Reminders alongside events. Overdue and upcoming reminders sit in the list, and you can check them off there.
 - Weather for each day. Daily forecasts from Apple Weather, for your current location or a city you choose.
 - Birthdays and attendees. Contact names and photos for birthdays and the people invited to an event.
 - Calendar sets. Group calendars into sets like Work and Home, then switch between them.
 - Search. Find events by title, place, notes, or calendar, with matching days marked in the grid.
+- Shortcuts and Focus. Add events, quick add a sentence, or get your upcoming events from Shortcuts and Siri. A Focus filter shows only the calendars you pick while that Focus is on.
 
 ## Requirements
 
@@ -42,7 +45,7 @@ Each release is signed with a Developer ID and notarized by Apple.
 
 ## Quick add
 
-Type into the field at the bottom of the panel and press Return.
+Type into the field at the top of the panel and press Return.
 
 | You type | Daybar adds |
 | --- | --- |
@@ -67,6 +70,7 @@ Start with `remind`, `todo`, or `task` to add a reminder. Add `/name` to pick a 
 | <kbd>⌘</kbd><kbd>↩</kbd> | Save the event you're editing, or join the open event's call |
 | <kbd>⌘</kbd><kbd>⌫</kbd> | Delete the open event |
 | <kbd>⌘</kbd><kbd>[</kbd> | Go back |
+| <kbd>⌘</kbd><kbd>Z</kbd> and <kbd>⇧</kbd><kbd>⌘</kbd><kbd>Z</kbd> | Undo or redo the last change to your calendar |
 | <kbd>Tab</kbd> and <kbd>⇧</kbd><kbd>Tab</kbd> | Move between fields while editing |
 | <kbd>Esc</kbd> | Leave a field, close search, or close the panel |
 
