@@ -140,7 +140,12 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GITHUB_TOKEN: ${{ github.token }}
         run: |
-          npx --yes changelogithub@15.0.5 || gh release create "$TAG" --title "$TAG" --generate-notes --verify-tag
+          notes=".github/releases/$TAG.md"
+          if [ -f "$notes" ]; then
+            gh release create "$TAG" --title "Daybar ${TAG#v}" --notes-file "$notes" --verify-tag
+          else
+            npx --yes changelogithub@15.0.5 || gh release create "$TAG" --title "$TAG" --generate-notes --verify-tag
+          fi
           gh release upload "$TAG" "$DIST/Daybar.dmg" "$DIST/Daybar.dmg.sha256" "$DIST/Daybar.app.dSYM.zip" --clobber
 
       - name: Clean up
