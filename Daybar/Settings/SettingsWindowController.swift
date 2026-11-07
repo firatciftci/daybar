@@ -106,6 +106,15 @@ private struct GeneralPane: View {
                 .onChange(of: prefs.weekStart) { store.reload() }
                 Toggle(L.compactLayout, isOn: $prefs.compact)
                 Toggle(L.showQuickAdd, isOn: $prefs.showQuickAdd)
+                Picker(L.allDayPlacement, selection: $prefs.separateAllDay) {
+                    Text(L.allDayInline).tag(false)
+                    Text(L.allDayAbove).tag(true)
+                }
+                Picker(L.reminderPlacement, selection: $prefs.remindersByTime) {
+                    Text(L.remindersGrouped).tag(false)
+                    Text(L.remindersMixed).tag(true)
+                }
+                .disabled(!prefs.showReminders)
                 Toggle(L.weekNumbers, isOn: $prefs.showWeekNumbers)
                 TimeZonePicker(selection: $prefs.secondTimeZoneID)
             }

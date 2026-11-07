@@ -78,6 +78,12 @@ struct Occurrence: Identifiable, Hashable {
 
     var spansMultipleDays: Bool { spannedDays.count > 1 }
 
+    func fills(_ day: Date) -> Bool {
+        if isAllDay { return true }
+        guard spansMultipleDays else { return false }
+        return start < day.startOfDay && end >= day.startOfDay.adding(days: 1)
+    }
+
     static func order(_ a: Self, _ b: Self) -> Bool {
         if a.isAllDay != b.isAllDay { return a.isAllDay }
         if a.start != b.start { return a.start < b.start }
@@ -130,4 +136,6 @@ nonisolated struct ReminderItem: Identifiable, Hashable, Sendable {
         color = Color(cgColor: reminder.calendar?.cgColor ?? CGColor(gray: 0.5, alpha: 1))
         listTitle = reminder.calendar?.title ?? ""
     }
+
+    var sortMoment: Date { hasTime ? due : Calendar.current.startOfDay(for: due) }
 }

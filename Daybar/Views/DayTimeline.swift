@@ -22,7 +22,7 @@ struct DayTimelineLayout: View {
                     if !allDay.isEmpty {
                         VStack(spacing: 3) {
                             ForEach(allDay) { occurrence in
-                                AllDayChip(occurrence: occurrence)
+                                AllDayChip(occurrence: occurrence, day: day)
                             }
                         }
                         .padding(.horizontal, 12)
@@ -34,46 +34,6 @@ struct DayTimelineLayout: View {
                 }
             }
         }
-    }
-}
-
-private struct AllDayChip: View {
-    let occurrence: Occurrence
-    @Environment(PanelModel.self) private var model
-    @Environment(ContactsModel.self) private var contacts
-
-    var body: some View {
-        Button {
-            model.show(occurrence)
-        } label: {
-            label
-        }
-        .buttonStyle(RowButtonStyle(cornerRadius: 6, hoverable: false))
-        .contextMenu { EventContextMenu(occurrence: occurrence) }
-    }
-
-    private var label: some View {
-        HStack(spacing: 6) {
-            if let birthday = occurrence.birthday {
-                ContactAvatar(card: contacts.card(forBirthday: birthday), name: birthday.name, size: 16)
-                Text(birthday.name)
-                    .foregroundStyle(.primary)
-                Text(birthday.ageLine(on: occurrence.start))
-                    .foregroundStyle(.secondary)
-                    .fontWeight(.medium)
-                Spacer(minLength: 0)
-                BirthdayGlyph(size: 11)
-            } else {
-                Text(occurrence.title)
-                    .foregroundStyle(occurrence.color.mix(with: .primary, by: 0.35))
-            }
-        }
-        .font(.system(size: 11.5, weight: .semibold))
-        .lineLimit(1)
-        .padding(.horizontal, 8)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .frame(height: 22)
-        .background(occurrence.birthday == nil ? occurrence.color.opacity(0.2) : Color.pink.opacity(0.14), in: .rect(cornerRadius: 6))
     }
 }
 

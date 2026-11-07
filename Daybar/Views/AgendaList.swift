@@ -19,12 +19,25 @@ enum AgendaItem: Identifiable {
     }
 }
 
+struct AgendaLayout: Equatable {
+    var compact = false
+    var separateAllDay = false
+    var remindersByTime = false
+}
+
+extension EnvironmentValues {
+    @Entry var agendaLayout = AgendaLayout()
+}
+
 struct AgendaList: View {
     @Environment(PanelModel.self) private var model
     @Environment(CalendarStore.self) private var store
     @Environment(WeatherModel.self) private var weather
+    @Environment(Preferences.self) private var prefs
     @Environment(\.metrics) private var metrics
     @State private var position = ScrollPosition(id: Date().startOfDay, anchor: .top)
+    @State private var pendingTarget: Date?
+    @State private var shownLayout: AgendaLayout?
     @State private var suppressSyncUntil = Date.distantPast
     @State private var userScrolling = false
     @State private var settle: Task<Void, Never>?
@@ -59,8 +72,13 @@ struct AgendaList: View {
         return result
     }
 
+    private var liveLayout: AgendaLayout {
+        AgendaLayout(compact: metrics.compact, separateAllDay: prefs.separateAllDay, remindersByTime: prefs.remindersByTime)
+    }
+
     var body: some View {
         let items = items
+        let layout = shownLayout ?? liveLayout
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 0) {
                 ForEach(items) { item in
@@ -69,7 +87,7 @@ struct AgendaList: View {
                         VStack(alignment: .leading, spacing: 0) {
                             DayHeader(date: date, forecast: weather.forecast(for: date))
                             DaySectionContent(date: date)
-                                .padding(.bottom, metrics.compact ? 2 : 8)
+                                .padding(.bottom, layout.compact ? 2 : 8)
                         }
                         .id(date)
                     case let .gap(start, end):
@@ -87,6 +105,8 @@ struct AgendaList: View {
             .padding(.bottom, 12)
             .opacity(jumpOpacity)
             .offset(y: jumpOffset)
+            .environment(\.metrics, Metrics(compact: layout.compact))
+            .environment(\.agendaLayout, layout)
         }
         .scrollPosition($position, anchor: .top)
         .scrollIndicators(.never)
@@ -104,7 +124,10 @@ struct AgendaList: View {
             guard let request else { return }
             scroll(to: request.day, in: items, animated: request.animated)
         }
+        .onChange(of: liveLayout) { restyle(in: items) }
+        .onChange(of: store.range.start) { pin(in: items) }
         .task {
+            settleLayout()
             scroll(to: model.selectedDate, in: items, animated: false)
             try? await Task.sleep(for: .milliseconds(60))
             scroll(to: model.selectedDate, in: self.items, animated: false)
@@ -117,16 +140,22 @@ struct AgendaList: View {
         let currentIndex = visibleIDs.min().flatMap { top in items.firstIndex { $0.contains(top) } }
         suppressSyncUntil = Date().addingTimeInterval(0.8)
         settle?.cancel()
+        settleLayout()
         if animated, let currentIndex, abs(targetIndex - currentIndex) <= 2 {
+            pendingTarget = nil
             setJump(opacity: 1, offset: 0)
             withAnimation(.smooth(duration: 0.32)) {
                 position.scrollTo(id: target, anchor: .top)
             }
             return
         }
+        pendingTarget = target
         guard animated else {
             setJump(opacity: 1, offset: 0)
-            settle = Task { await converge(on: target) }
+            settle = Task {
+                await converge(on: target)
+                if !Task.isCancelled { pendingTarget = nil }
+            }
             return
         }
         let direction: CGFloat = targetIndex >= (currentIndex ?? targetIndex) ? 1 : -1
@@ -141,8 +170,55 @@ struct AgendaList: View {
                 jumpOpacity = 1
                 jumpOffset = 0
             }
+            pendingTarget = nil
             suppressSyncUntil = Date().addingTimeInterval(0.4)
         }
+    }
+
+    private func pin(in items: Array<AgendaItem>) {
+        guard pendingTarget == nil, let target = anchor(in: items) else { return }
+        suppressSyncUntil = Date().addingTimeInterval(0.8)
+        settle?.cancel()
+        settleLayout()
+        setJump(opacity: 1, offset: 0)
+        settle = Task { await converge(on: target) }
+    }
+
+    private func restyle(in items: Array<AgendaItem>) {
+        guard pendingTarget == nil else {
+            settleLayout()
+            return
+        }
+        let target = anchor(in: items)
+        suppressSyncUntil = Date().addingTimeInterval(1)
+        settle?.cancel()
+        settle = Task {
+            if !reduceMotion {
+                withAnimation(.easeIn(duration: 0.1)) { jumpOpacity = 0 }
+                try? await Task.sleep(for: .milliseconds(100))
+                guard !Task.isCancelled else { return }
+            }
+            setJump(opacity: reduceMotion ? 1 : 0, offset: 0)
+            settleLayout()
+            if let target { await converge(on: target) }
+            guard !Task.isCancelled else { return }
+            withAnimation(.smooth(duration: 0.28)) { jumpOpacity = 1 }
+            suppressSyncUntil = Date().addingTimeInterval(0.3)
+        }
+    }
+
+    private func settleLayout() {
+        guard shownLayout != liveLayout else { return }
+        var transaction = Transaction()
+        transaction.disablesAnimations = true
+        withTransaction(transaction) { shownLayout = liveLayout }
+    }
+
+    private func anchor(in items: Array<AgendaItem>) -> Date? {
+        if let selected = items.first(where: { $0.contains(model.selectedDate) })?.id, visibleIDs.contains(selected) {
+            return selected
+        }
+        return visibleIDs.min()
     }
 
     private func converge(on target: Date) async {
@@ -272,6 +348,7 @@ private enum DayRow: Identifiable {
     case free(TimeInterval, Date)
     case now(Date)
     case reminder(ReminderItem)
+    case remindersHeading
     case empty
 
     var id: String {
@@ -280,7 +357,18 @@ private enum DayRow: Identifiable {
         case .free(_, let date): "f\(date.timeIntervalSinceReferenceDate)"
         case .now: "now"
         case .reminder(let item): "r\(item.id)"
+        case .remindersHeading: "reminders"
         case .empty: "empty"
+        }
+    }
+
+    func comes(after moment: Date) -> Bool {
+        switch self {
+        case .event(let occurrence): !occurrence.isAllDay && occurrence.start > moment
+        case .free(_, let date): date > moment
+        case .now(let now): now > moment
+        case .reminder(let item): item.sortMoment > moment
+        case .remindersHeading, .empty: false
         }
     }
 }
@@ -289,11 +377,18 @@ private struct DaySectionContent: View {
     let date: Date
     @Environment(CalendarStore.self) private var store
     @Environment(PanelModel.self) private var model
+    @Environment(\.agendaLayout) private var layout
     @Environment(\.metrics) private var metrics
 
-    private var rows: Array<DayRow> {
+    private var banner: Array<Occurrence> {
+        guard layout.separateAllDay else { return [] }
+        return store.occurrences(on: date).filter { $0.fills(date) }
+    }
+
+    private func rows(excluding banner: Array<Occurrence>) -> Array<DayRow> {
         let now = model.now
-        let occurrences = store.occurrences(on: date)
+        let hidden = Set(banner.map(\.id))
+        let occurrences = store.occurrences(on: date).filter { !hidden.contains($0.id) }
         let isToday = date.isToday
         let showsFuture = date >= now.startOfDay
         var rows: Array<DayRow> = []
@@ -318,18 +413,38 @@ private struct DaySectionContent: View {
         if !placedNow, isToday, !occurrences.isEmpty {
             rows.append(.now(now))
         }
-        for item in store.reminders(on: date) {
-            rows.append(.reminder(item))
+        let reminders = store.reminders(on: date)
+        if layout.remindersByTime {
+            for item in reminders {
+                let index = rows.firstIndex { $0.comes(after: item.sortMoment) } ?? rows.endIndex
+                rows.insert(.reminder(item), at: index)
+            }
+        } else if !reminders.isEmpty {
+            if !rows.isEmpty || !banner.isEmpty { rows.append(.remindersHeading) }
+            for item in reminders {
+                rows.append(.reminder(item))
+            }
         }
-        if rows.isEmpty {
+        if rows.isEmpty, banner.isEmpty || isToday {
             rows.append(.empty)
         }
         return rows
     }
 
     var body: some View {
+        let banner = banner
         VStack(alignment: .leading, spacing: 1) {
-            ForEach(rows) { row in
+            if !banner.isEmpty {
+                FlowLayout(spacing: 4) {
+                    ForEach(banner) { occurrence in
+                        AllDayChip(occurrence: occurrence, day: date, fills: false)
+                    }
+                }
+                .padding(.horizontal, 12)
+                .padding(.bottom, metrics.compact ? 3 : 5)
+                .transition(.opacity)
+            }
+            ForEach(rows(excluding: banner)) { row in
                 switch row {
                 case .event(let occurrence):
                     if occurrence.birthday != nil {
@@ -343,6 +458,8 @@ private struct DaySectionContent: View {
                     NowMarker(now: now)
                 case .reminder(let item):
                     ReminderRow(item: item)
+                case .remindersHeading:
+                    RemindersHeading()
                 case .empty:
                     Text(L.freeRestOfDay)
                         .font(.system(size: metrics.metaSize))
@@ -356,278 +473,23 @@ private struct DaySectionContent: View {
     }
 }
 
-struct AgendaEventRow: View {
-    let occurrence: Occurrence
-    let day: Date
-
-    @Environment(PanelModel.self) private var model
-    @Environment(\.metrics) private var metrics
-
-    private var timeLabels: (String, String?) {
-        if occurrence.isAllDay { return (L.allDay, nil) }
-        let startsToday = occurrence.start.isSameDay(as: day)
-        let endsToday = occurrence.end.addingTimeInterval(-1).isSameDay(as: day)
-        switch (startsToday, endsToday) {
-        case (true, true): return (Fmt.time(occurrence.start), Fmt.time(occurrence.end))
-        case (true, false): return (Fmt.time(occurrence.start), nil)
-        case (false, true): return (Fmt.time(occurrence.end), nil)
-        case (false, false): return (L.allDay, nil)
-        }
-    }
-
-    var body: some View {
-        let now = model.now
-        let live = occurrence.isLive(at: now)
-        let past = occurrence.end <= now && !occurrence.isAllDay
-        let labels = timeLabels
-        let joinable = occurrence.meeting != nil && occurrence.end > now && occurrence.start.timeIntervalSince(now) < 15 * 60
-        ZStack(alignment: .trailing) {
-            Button {
-                model.show(occurrence)
-            } label: {
-                HStack(alignment: .center, spacing: 10) {
-                    VStack(alignment: .trailing, spacing: 1) {
-                        Text(labels.0)
-                            .font(.system(size: metrics.timeSize, weight: .medium).monospacedDigit())
-                            .foregroundStyle(live ? AnyShapeStyle(occurrence.color) : AnyShapeStyle(.secondary))
-                        if let end = labels.1, !metrics.compact {
-                            Text(end)
-                                .font(.system(size: metrics.timeSize).monospacedDigit())
-                                .foregroundStyle(.tertiary)
-                        }
-                    }
-                    .lineLimit(1)
-                    .frame(width: metrics.timeWidth, alignment: .trailing)
-
-                    ProgressBar(
-                        color: occurrence.color, progress: live ? occurrence.progress(at: now) : (past ? 1 : 0),
-                        outlined: occurrence.isPendingInvite
-                    )
-                    .frame(width: metrics.compact ? 3 : 4)
-                    .padding(.vertical, 2)
-
-                    if metrics.compact {
-                        HStack(alignment: .firstTextBaseline, spacing: 6) {
-                            title
-                            if let meta = metaLine {
-                                Text(meta)
-                                    .font(.system(size: metrics.metaSize))
-                                    .foregroundStyle(.tertiary)
-                            }
-                        }
-                        .lineLimit(1)
-                    } else {
-                        VStack(alignment: .leading, spacing: 2) {
-                            title
-                                .lineLimit(2)
-                            if let meta = metaLine {
-                                HStack(spacing: 4) {
-                                    if let meeting = occurrence.meeting {
-                                        MeetingGlyph(service: meeting.service, size: 10.5)
-                                    }
-                                    Text(meta)
-                                        .lineLimit(1)
-                                }
-                                .font(.system(size: metrics.metaSize))
-                                .foregroundStyle(.secondary)
-                            }
-                        }
-                    }
-                    Spacer(minLength: joinable ? 70 : 0)
-                }
-                .padding(.vertical, metrics.rowPadding)
-                .padding(.horizontal, 6)
-                .frame(minHeight: metrics.rowHeight)
-                .background {
-                    if live {
-                        RoundedRectangle(cornerRadius: 10, style: .continuous)
-                            .fill(occurrence.color.opacity(0.14))
-                    }
-                }
-            }
-            .buttonStyle(RowButtonStyle())
-            .contextMenu { EventContextMenu(occurrence: occurrence) }
-            if joinable, let meeting = occurrence.meeting {
-                JoinButton(meeting: meeting, prominent: live)
-                    .padding(.trailing, 8)
-            }
-        }
-        .opacity(past ? 0.55 : 1)
-    }
-
-    private var title: some View {
-        Text(occurrence.title)
-            .font(.system(size: metrics.titleSize, weight: .medium))
-            .strikethrough(occurrence.isDeclined)
-            .foregroundStyle(occurrence.isDeclined ? AnyShapeStyle(.secondary) : AnyShapeStyle(.primary))
-    }
-
-    private var metaLine: String? {
-        if let location = occurrence.location { return location }
-        return occurrence.meeting?.service.name
-    }
-}
-
-struct BirthdayRow: View {
-    let occurrence: Occurrence
-    @Environment(PanelModel.self) private var model
-    @Environment(ContactsModel.self) private var contacts
-    @Environment(\.metrics) private var metrics
-    @State private var bounce = 0
-
-    var body: some View {
-        let birthday = occurrence.birthday
-        Button {
-            model.show(occurrence)
-        } label: {
-            HStack(spacing: 10) {
-                let avatar: CGFloat = metrics.compact ? 20 : 30
-                ContactAvatar(
-                    card: birthday.flatMap { contacts.card(forBirthday: $0) }, name: birthday?.name ?? occurrence.title, size: avatar
-                )
-                .overlay(alignment: .bottomTrailing) {
-                    BirthdayGlyph(size: avatar * 0.3, bounce: bounce)
-                        .padding(avatar * 0.08)
-                        .background(.regularMaterial, in: .circle)
-                        .offset(x: avatar * 0.18, y: avatar * 0.12)
-                }
-                .padding(.trailing, avatar * 0.18)
-                .frame(width: metrics.timeWidth, alignment: .trailing)
-                SprinkleBar(width: metrics.compact ? 3 : 4)
-                    .padding(.vertical, 2)
-                Group {
-                    if metrics.compact {
-                        HStack(alignment: .firstTextBaseline, spacing: 6) {
-                            name
-                            age
-                        }
-                    } else {
-                        VStack(alignment: .leading, spacing: 2) {
-                            name
-                            age
-                        }
-                    }
-                }
-                .lineLimit(1)
-                Spacer(minLength: 0)
-            }
-            .padding(.vertical, metrics.rowPadding)
-            .padding(.horizontal, 6)
-            .frame(minHeight: metrics.rowHeight)
-        }
-        .buttonStyle(RowButtonStyle())
-        .onHover { if $0 { bounce += 1 } }
-        .contextMenu { EventContextMenu(occurrence: occurrence) }
-        .accessibilityLabel("\(birthday?.name ?? occurrence.title), \(birthday?.ageLine(on: occurrence.start) ?? L.birthday)")
-    }
-
-    private var name: some View {
-        Text(occurrence.birthday?.name ?? occurrence.title)
-            .font(.system(size: metrics.titleSize, weight: .semibold))
-    }
-
-    private var age: some View {
-        Text(occurrence.birthday?.ageLine(on: occurrence.start) ?? L.birthday)
-            .font(.system(size: metrics.metaSize, weight: .medium))
-            .foregroundStyle(.secondary)
-    }
-}
-
-private struct FreeTimeRow: View {
-    let interval: TimeInterval
+private struct RemindersHeading: View {
     @Environment(\.metrics) private var metrics
 
     var body: some View {
         HStack(spacing: 10) {
             Color.clear.frame(width: metrics.timeWidth)
+            Text(L.remindersHeading)
+                .font(.system(size: metrics.metaSize - 0.5, weight: .semibold))
+                .foregroundStyle(.secondary)
+                .padding(.leading, -2)
             Rectangle()
-                .fill(.primary.opacity(0.14))
-                .frame(width: 4, height: 1)
-            Text(L.freeTime(Fmt.duration(interval)))
-                .font(.system(size: 11))
-                .foregroundStyle(.tertiary)
+                .fill(.primary.opacity(0.08))
+                .frame(height: 1)
         }
         .padding(.horizontal, 6)
-        .frame(height: metrics.compact ? 16 : 22)
-    }
-}
-
-private struct NowMarker: View {
-    let now: Date
-    @Environment(\.metrics) private var metrics
-
-    var body: some View {
-        HStack(spacing: 0) {
-            Text(Fmt.time(now))
-                .font(.system(size: metrics.timeSize - 0.5, weight: .semibold).monospacedDigit())
-                .foregroundStyle(.red)
-                .frame(width: metrics.timeWidth, alignment: .trailing)
-            Circle()
-                .fill(.red)
-                .frame(width: 7, height: 7)
-                .padding(.leading, 8)
-            Rectangle()
-                .fill(.red.opacity(0.75))
-                .frame(height: 1.2)
-        }
-        .padding(.horizontal, 6)
-        .frame(height: metrics.compact ? 12 : 18)
-        .accessibilityLabel(L.now)
-    }
-}
-
-struct ReminderRow: View {
-    let item: ReminderItem
-    @Environment(CalendarStore.self) private var store
-    @Environment(\.metrics) private var metrics
-    @State private var done = false
-
-    var body: some View {
-        HStack(spacing: 10) {
-            Text(item.hasTime ? Fmt.time(item.due) : (item.due < Date().startOfDay ? L.overdue : ""))
-                .font(.system(size: metrics.timeSize, weight: .medium).monospacedDigit())
-                .foregroundStyle(item.due < Date().startOfDay ? AnyShapeStyle(Color.red) : AnyShapeStyle(.secondary))
-                .frame(width: metrics.timeWidth, alignment: .trailing)
-            Button {
-                withAnimation(.snappy(duration: 0.25)) { done = true }
-                Task {
-                    try? await Task.sleep(for: .milliseconds(550))
-                    store.complete(item)
-                }
-            } label: {
-                ZStack {
-                    Circle()
-                        .strokeBorder(item.color, lineWidth: 1.5)
-                    if done {
-                        Circle()
-                            .fill(item.color)
-                            .padding(3)
-                            .transition(.scale)
-                    }
-                }
-                .frame(width: 16, height: 16)
-                .contentShape(.circle)
-            }
-            .buttonStyle(.plain)
-            .padding(.horizontal, -6)
-            .accessibilityLabel(item.title)
-            .accessibilityAddTraits(done ? .isSelected : [])
-            .help(L.completeReminder)
-            VStack(alignment: .leading, spacing: 1) {
-                Text(item.title)
-                    .font(.system(size: metrics.titleSize))
-                    .foregroundStyle(done ? AnyShapeStyle(.secondary) : AnyShapeStyle(.primary))
-                    .lineLimit(metrics.compact ? 1 : 2)
-                if !metrics.compact {
-                    Text(item.listTitle)
-                        .font(.system(size: metrics.metaSize - 0.5))
-                        .foregroundStyle(.tertiary)
-                }
-            }
-            Spacer(minLength: 0)
-        }
-        .padding(.vertical, metrics.rowPadding)
-        .padding(.horizontal, 6)
-        .frame(minHeight: metrics.rowHeight)
+        .padding(.top, metrics.compact ? 4 : 8)
+        .frame(height: metrics.compact ? 20 : 26, alignment: .bottom)
+        .accessibilityAddTraits(.isHeader)
     }
 }

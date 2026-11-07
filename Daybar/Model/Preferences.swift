@@ -63,6 +63,8 @@ final class Preferences {
     var weatherPlace: WeatherPlace? { didSet { encode(weatherPlace, "weatherPlace") } }
     var compact: Bool { didSet { store(compact, "compact") } }
     var showQuickAdd: Bool { didSet { store(showQuickAdd, "showQuickAdd") } }
+    var separateAllDay: Bool { didSet { store(separateAllDay, "separateAllDay") } }
+    var remindersByTime: Bool { didSet { store(remindersByTime, "remindersByTime") } }
     var hasOnboarded: Bool { didSet { store(hasOnboarded, "hasOnboarded") } }
     var panelHeight: Double { didSet { store(panelHeight, "panelHeight") } }
 
@@ -85,6 +87,8 @@ final class Preferences {
         weatherPlace = Self.decode(WeatherPlace.self, d, "weatherPlace")
         compact = d.bool(forKey: "compact")
         showQuickAdd = d.object(forKey: "showQuickAdd") as? Bool ?? true
+        separateAllDay = d.bool(forKey: "separateAllDay")
+        remindersByTime = d.bool(forKey: "remindersByTime")
         hasOnboarded = d.bool(forKey: "hasOnboarded")
         panelHeight = d.double(forKey: "panelHeight")
     }
