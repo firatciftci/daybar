@@ -462,9 +462,10 @@ final class ForegroundWindows {
         activation?.cancel()
         activation = Task {
             for _ in 0..<20 {
-                if NSApp.isActive, window.isKeyWindow { break }
+                let focused = window.isKeyWindow || window.attachedSheet?.isKeyWindow == true
+                if NSApp.isActive, focused { break }
                 Self.activate()
-                window.makeKeyAndOrderFront(nil)
+                if window.attachedSheet == nil { window.makeKeyAndOrderFront(nil) }
                 try? await Task.sleep(for: .milliseconds(100))
                 guard !Task.isCancelled else { return }
             }

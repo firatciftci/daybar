@@ -20,6 +20,7 @@ struct CalendarsPane: View {
     @Environment(Preferences.self) private var prefs
     @Environment(CalendarStore.self) private var store
     @Environment(SettingsRoute.self) private var route
+    @Environment(\.appearsActive) private var appearsActive
     @State private var editing: CalendarSet?
     @State private var pendingDeletion: CalendarSet?
     @State private var dropTarget: UUID?
@@ -101,8 +102,8 @@ struct CalendarsPane: View {
         } message: { set in
             Text(prefs.activeSetID == set.id ? L.deleteActiveSetMessage : L.deleteSetMessage)
         }
-        .onChange(of: route.wantsNewSet, initial: true) {
-            guard route.wantsNewSet else { return }
+        .onChange(of: route.wantsNewSet && appearsActive, initial: true) {
+            guard route.wantsNewSet, appearsActive else { return }
             route.wantsNewSet = false
             beginNewSet()
         }
