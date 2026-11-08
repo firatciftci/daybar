@@ -85,7 +85,7 @@ struct CalendarsPane: View {
             }
         }
         .formStyle(.grouped)
-        .frame(minHeight: 500, alignment: .top)
+        .frame(minHeight: 560, alignment: .top)
         .sheet(item: $editing) { set in
             CalendarSetEditor(set: set, isNew: !prefs.calendarSets.contains { $0.id == set.id }, onSave: save) {
                 delete(set)
@@ -300,33 +300,49 @@ private struct CalendarSetEditor: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            header
-            Form {
-                Section(L.setIcon) {
-                    symbolGrid
+        Form {
+            Section {
+                TextField(L.setName, text: $draft.name, prompt: Text(L.setNamePlaceholder))
+                    .focused($nameFocused)
+                    .onChange(of: draft.name, suggestSymbol)
+            } header: {
+                VStack(spacing: 10) {
+                    SetTile(symbol: draft.symbol, size: 48)
+                    Text(isNew ? L.newSet : L.editSetTitle)
+                        .font(.title3.weight(.semibold))
+                        .foregroundStyle(.primary)
                 }
-                ForEach(store.calendarsBySource, id: \.source) { group in
-                    calendarSection(group.source, group.calendars)
+                .frame(maxWidth: .infinity)
+                .padding(.bottom, 8)
+            } footer: {
+                if let problem {
+                    Text(problem)
+                        .foregroundStyle(nameTaken ? AnyShapeStyle(.red) : AnyShapeStyle(.secondary))
                 }
             }
-            .formStyle(.grouped)
-            Divider()
-            HStack(spacing: 8) {
-                if !isNew {
+            Section(L.setIcon) {
+                symbolGrid
+            }
+            ForEach(store.calendarsBySource, id: \.source) { group in
+                calendarSection(group.source, group.calendars)
+            }
+        }
+        .formStyle(.grouped)
+        .toolbar {
+            if !isNew {
+                ToolbarItem(placement: .destructiveAction) {
                     Button(L.deleteSetEllipsis, role: .destructive) { confirmingDelete = true }
                 }
-                Spacer()
+            }
+            ToolbarItem(placement: .cancellationAction) {
                 Button(L.cancel, role: .cancel) { dismiss() }
-                    .keyboardShortcut(.cancelAction)
+            }
+            ToolbarItem(placement: .confirmationAction) {
                 Button(isNew ? L.createSet : L.save, action: save)
-                    .keyboardShortcut(.defaultAction)
                     .disabled(name.isEmpty || problem != nil)
             }
-            .controlSize(.large)
-            .padding(16)
         }
-        .frame(width: 460, height: 480)
+        .frame(width: 460, height: 460)
         .onAppear { nameFocused = isNew }
         .confirmationDialog(L.deleteSetTitle(draft.name), isPresented: $confirmingDelete, titleVisibility: .visible) {
             Button(L.deleteSet, role: .destructive) {
@@ -339,31 +355,11 @@ private struct CalendarSetEditor: View {
         }
     }
 
-    private var header: some View {
-        HStack(alignment: .top, spacing: 14) {
-            SetTile(symbol: draft.symbol, size: 52)
-            VStack(alignment: .leading, spacing: 6) {
-                Text(isNew ? L.newSet : L.editSetTitle)
-                    .font(.headline)
-                TextField(L.setName, text: $draft.name, prompt: Text(L.setNamePlaceholder))
-                    .textFieldStyle(.roundedBorder)
-                    .focused($nameFocused)
-                    .onSubmit(save)
-                    .onChange(of: draft.name) {
-                        guard !symbolChosen else { return }
-                        let symbol = CalendarSet.suggestedSymbol(for: draft.name) ?? CalendarSet.symbols[0]
-                        guard symbol != draft.symbol else { return }
-                        withAnimation(Motion.select) { draft.symbol = symbol }
-                    }
-                Text(problem ?? " ")
-                    .font(.caption)
-                    .foregroundStyle(nameTaken ? AnyShapeStyle(.red) : AnyShapeStyle(.secondary))
-                    .animation(Motion.fade, value: problem)
-            }
-        }
-        .padding(.horizontal, 20)
-        .padding(.top, 20)
-        .padding(.bottom, 4)
+    private func suggestSymbol() {
+        guard !symbolChosen else { return }
+        let symbol = CalendarSet.suggestedSymbol(for: draft.name) ?? CalendarSet.symbols[0]
+        guard symbol != draft.symbol else { return }
+        withAnimation(Motion.select) { draft.symbol = symbol }
     }
 
     private var symbolGrid: some View {
@@ -393,22 +389,9 @@ private struct CalendarSetEditor: View {
     }
 
     private func calendarSection(_ source: String, _ calendars: Array<EKCalendar>) -> some View {
-        let ids = Set(calendars.map(\.calendarIdentifier))
-        let allChosen = ids.isSubset(of: draft.calendarIDs)
-        return Section {
+        Section {
             ForEach(calendars, id: \.calendarIdentifier) { calendar in
-                Toggle(
-                    isOn: Binding(
-                        get: { draft.calendarIDs.contains(calendar.calendarIdentifier) },
-                        set: { on in
-                            if on {
-                                draft.calendarIDs.insert(calendar.calendarIdentifier)
-                            } else {
-                                draft.calendarIDs.remove(calendar.calendarIdentifier)
-                            }
-                        }
-                    )
-                ) {
+                Toggle(isOn: membership(of: calendar)) {
                     HStack(spacing: 8) {
                         Circle()
                             .fill(Color(cgColor: calendar.cgColor))
@@ -419,20 +402,25 @@ private struct CalendarSetEditor: View {
                 .toggleStyle(.checkbox)
             }
         } header: {
-            HStack {
-                Text(source)
-                Spacer()
-                Button(allChosen ? L.deselectAll : L.selectAll) {
-                    if allChosen {
-                        draft.calendarIDs.subtract(ids)
-                    } else {
-                        draft.calendarIDs.formUnion(ids)
-                    }
-                }
-                .buttonStyle(.link)
-                .font(.callout)
+            Toggle(sources: calendars.map(membership(of:)), isOn: \.self) {
+                Text(source.isEmpty ? L.calendars : source)
             }
+            .toggleStyle(.checkbox)
         }
+    }
+
+    private func membership(of calendar: EKCalendar) -> Binding<Bool> {
+        let id = calendar.calendarIdentifier
+        return Binding(
+            get: { draft.calendarIDs.contains(id) },
+            set: { on in
+                if on {
+                    draft.calendarIDs.insert(id)
+                } else {
+                    draft.calendarIDs.remove(id)
+                }
+            }
+        )
     }
 
     private func save() {

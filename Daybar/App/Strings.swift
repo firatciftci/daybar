@@ -177,8 +177,6 @@ enum L {
     static let setName = "Name"
     static let setNamePlaceholder = "Work"
     static let setIcon = "Icon"
-    static let selectAll = "Select all"
-    static let deselectAll = "Deselect all"
     static let duplicateSetName = "You already have a set with this name."
     static let chooseCalendar = "Choose at least one calendar."
     static let showingBadge = "Showing"
