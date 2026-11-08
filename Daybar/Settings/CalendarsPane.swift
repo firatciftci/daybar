@@ -392,7 +392,7 @@ private struct CalendarSetEditor: View {
         Section {
             ForEach(calendars, id: \.calendarIdentifier) { calendar in
                 Toggle(isOn: membership(of: calendar)) {
-                    HStack(spacing: 8) {
+                    HStack(spacing: 4) {
                         Circle()
                             .fill(Color(cgColor: calendar.cgColor))
                             .frame(width: 9, height: 9)
