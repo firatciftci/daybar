@@ -10,7 +10,13 @@ enum MenuBarIcon {
         let glyph = meeting?.nsImage
         let image = NSImage(size: size, flipped: false) { _ in
             if meeting != nil {
-                glyph?.draw(in: NSRect(x: 1, y: 0.5, width: 16, height: 16), from: .zero, operation: .sourceOver, fraction: 1)
+                if let glyph {
+                    let scale = min(17 / glyph.size.width, 16 / glyph.size.height)
+                    let width = glyph.size.width * scale
+                    let height = glyph.size.height * scale
+                    let frame = NSRect(x: (meetingWidth - width) / 2, y: (size.height - height) / 2, width: width, height: height)
+                    glyph.draw(in: frame, from: .zero, operation: .sourceOver, fraction: 1)
+                }
                 if live {
                     NSColor.black.setFill()
                     NSBezierPath(ovalIn: NSRect(x: 13.5, y: 12.5, width: 4.5, height: 4.5)).fill()
