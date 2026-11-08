@@ -1,4 +1,3 @@
-import EventKit
 import SwiftUI
 
 struct SearchField: View {
@@ -104,65 +103,6 @@ struct SearchResults: View {
             }
         }
         return groups
-    }
-}
-
-struct CalendarSetsMenu: View {
-    @Environment(CalendarStore.self) private var store
-    @Environment(Preferences.self) private var prefs
-
-    var body: some View {
-        Menu {
-            Picker(
-                L.calendarSets,
-                selection: Binding(
-                    get: { prefs.activeSetID },
-                    set: {
-                        prefs.activeSetID = $0
-                        store.reload()
-                    })
-            ) {
-                Text(L.allCalendars).tag(UUID?.none)
-                ForEach(prefs.calendarSets) { set in
-                    Text(set.name).tag(UUID?.some(set.id))
-                }
-            }
-            .pickerStyle(.inline)
-            ForEach(store.calendarsBySource, id: \.source) { group in
-                Section(group.source) {
-                    ForEach(group.calendars, id: \.calendarIdentifier) { calendar in
-                        Toggle(
-                            isOn: Binding(
-                                get: { prefs.isCalendarVisible(calendar.calendarIdentifier) },
-                                set: { _ in
-                                    prefs.toggleCalendar(calendar.calendarIdentifier)
-                                    store.reload()
-                                }
-                            )
-                        ) {
-                            Label {
-                                Text(calendar.title)
-                            } icon: {
-                                Image(systemName: "circle.fill")
-                                    .foregroundStyle(Color(cgColor: calendar.cgColor))
-                            }
-                        }
-                    }
-                }
-            }
-        } label: {
-            Image(
-                systemName: prefs.activeSetID == nil && prefs.hiddenCalendarIDs.isEmpty
-                    ? "square.3.layers.3d" : "square.3.layers.3d.top.filled"
-            )
-            .accessibilityLabel(L.calendars)
-            .font(.system(size: 12.5, weight: .semibold))
-        }
-        .menuStyle(.button)
-        .menuIndicator(.hidden)
-        .buttonStyle(GlassCircleStyle())
-        .fixedSize()
-        .help(prefs.activeSet?.name ?? L.calendars)
     }
 }
 

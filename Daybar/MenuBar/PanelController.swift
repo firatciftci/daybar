@@ -70,9 +70,9 @@ final class PanelController: NSObject, NSWindowDelegate {
         model.onDismiss = { [weak self] in self?.close() }
         model.onResize = { [weak self] phase in self?.resize(phase) }
         EventHistory.shared.onApply = { [weak model] in model?.refreshShownEvent() }
-        model.onOpenSettings = { [weak self] in
+        model.onOpenSettings = { [weak self] destination in
             self?.close()
-            SettingsWindowController.shared.show()
+            SettingsWindowController.shared.show(destination)
         }
     }
 

@@ -29,9 +29,47 @@ enum PanelMode: String, CaseIterable, Identifiable, Codable {
 }
 
 struct CalendarSet: Codable, Identifiable, Hashable {
+    static let symbols = [
+        "square.grid.2x2.fill", "briefcase.fill", "house.fill", "person.2.fill", "figure.run", "heart.fill", "graduationcap.fill",
+        "airplane", "star.fill", "book.fill", "music.note", "gamecontroller.fill", "leaf.fill", "cart.fill", "cross.case.fill",
+        "sparkles",
+    ]
+
+    private static let suggestions: Array<(words: Array<String>, symbol: String)> = [
+        (["work", "office", "job", "team", "client"], "briefcase.fill"),
+        (["home", "house", "personal", "me"], "house.fill"),
+        (["family", "kids", "friends", "social"], "person.2.fill"),
+        (["fitness", "gym", "sport", "run", "training", "health"], "figure.run"),
+        (["travel", "trip", "trips", "flights", "vacation"], "airplane"),
+        (["school", "class", "classes", "study", "university", "college"], "graduationcap.fill"),
+        (["music", "band", "concerts"], "music.note"),
+        (["games", "gaming"], "gamecontroller.fill"),
+        (["doctor", "medical", "appointments"], "cross.case.fill"),
+    ]
+
     var id = UUID()
     var name: String
+    var symbol: String
     var calendarIDs: Set<String>
+
+    init(name: String, symbol: String = Self.symbols[0], calendarIDs: Set<String>) {
+        self.name = name
+        self.symbol = symbol
+        self.calendarIDs = calendarIDs
+    }
+
+    init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        name = try container.decode(String.self, forKey: .name)
+        symbol = try container.decodeIfPresent(String.self, forKey: .symbol) ?? Self.symbols[0]
+        calendarIDs = try container.decode(Set<String>.self, forKey: .calendarIDs)
+    }
+
+    static func suggestedSymbol(for name: String) -> String? {
+        let words = Set(name.lowercased().split { !$0.isLetter }.map(String.init))
+        return suggestions.first { !words.isDisjoint(with: $0.words) }?.symbol
+    }
 }
 
 struct WeatherPlace: Codable, Hashable {
@@ -136,8 +174,21 @@ final class Preferences {
         return !hiddenCalendarIDs.contains(id)
     }
 
+    func saveSet(_ set: CalendarSet) {
+        if let index = calendarSets.firstIndex(where: { $0.id == set.id }) {
+            calendarSets[index] = set
+        } else {
+            calendarSets.append(set)
+        }
+    }
+
+    func deleteSet(_ id: UUID) {
+        if activeSetID == id { activeSetID = nil }
+        calendarSets.removeAll { $0.id == id }
+    }
+
     func toggleCalendar(_ id: String) {
-        if let activeSet, let index = calendarSets.firstIndex(of: activeSet) {
+        if let activeSetID, let index = calendarSets.firstIndex(where: { $0.id == activeSetID }) {
             if calendarSets[index].calendarIDs.contains(id) {
                 calendarSets[index].calendarIDs.remove(id)
             } else {

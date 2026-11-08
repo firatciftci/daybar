@@ -110,7 +110,7 @@ struct EventForm: View {
                         Label {
                             Text(calendar.title)
                         } icon: {
-                            Image(nsImage: swatch(calendar.color))
+                            Image(nsImage: NSImage.swatch(calendar.color))
                         }
                         .tag(calendar.calendarIdentifier)
                     }
@@ -138,14 +138,6 @@ struct EventForm: View {
 
     private var components: DatePickerComponents {
         model.draft.isAllDay ? [.date] : [.date, .hourAndMinute]
-    }
-
-    private func swatch(_ color: NSColor) -> NSImage {
-        NSImage(size: NSSize(width: 10, height: 10), flipped: false) { rect in
-            color.setFill()
-            NSBezierPath(ovalIn: rect.insetBy(dx: 0.5, dy: 0.5)).fill()
-            return true
-        }
     }
 }
 

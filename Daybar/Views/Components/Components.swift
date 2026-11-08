@@ -500,3 +500,13 @@ final class ForegroundWindows {
 }
 
 final class WelcomeWindow: NSWindow {}
+
+extension NSImage {
+    static func swatch(_ color: NSColor) -> NSImage {
+        NSImage(size: NSSize(width: 10, height: 10), flipped: false) { rect in
+            color.setFill()
+            NSBezierPath(ovalIn: rect.insetBy(dx: 0.5, dy: 0.5)).fill()
+            return true
+        }
+    }
+}

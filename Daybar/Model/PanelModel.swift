@@ -69,7 +69,7 @@ final class PanelModel {
     var now = Date()
 
     @ObservationIgnored var onDismiss: (() -> Void)?
-    @ObservationIgnored var onOpenSettings: (() -> Void)?
+    @ObservationIgnored var onOpenSettings: ((SettingsDestination) -> Void)?
     @ObservationIgnored var onResize: ((ResizePhase) -> Void)?
 
     func prepareForOpen() {

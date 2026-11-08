@@ -505,7 +505,7 @@ private struct MoreMenu: View {
             Divider()
             Toggle(L.compactLayout, systemImage: "rectangle.compress.vertical", isOn: $prefs.compact)
             Divider()
-            Button(L.settingsMenu, systemImage: "gearshape") { model.onOpenSettings?() }
+            Button(L.settingsMenu, systemImage: "gearshape") { model.onOpenSettings?(.lastPage) }
             Button(L.quit, systemImage: "power") { NSApp.terminate(nil) }
         } label: {
             GlassMenuLabel(symbol: "ellipsis")

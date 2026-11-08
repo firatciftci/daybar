@@ -1,5 +1,4 @@
 import AppKit
-import EventKit
 import KeyboardShortcuts
 import ServiceManagement
 import SwiftUI
@@ -15,6 +14,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
     static let shared = SettingsWindowController()
 
     private var opening = false
+    private let tabs: SettingsTabs
 
     private init() {
         let tabs = SettingsTabs()
@@ -28,6 +28,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
                     .environment(Preferences.shared)
                     .environment(WeatherModel.shared)
                     .environment(Permissions.shared)
+                    .environment(SettingsRoute.shared)
                     .frame(width: 500)
                     .fixedSize(horizontal: false, vertical: true))
             host.sizingOptions = .preferredContentSize
@@ -47,6 +48,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         window.styleMask = [.titled, .closable, .miniaturizable]
         window.toolbarStyle = .preference
         window.isReleasedWhenClosed = false
+        self.tabs = tabs
         super.init(window: window)
         window.delegate = self
     }
@@ -54,8 +56,14 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
     @available(*, unavailable)
     required init?(coder _: NSCoder) { nil }
 
-    func show() {
+    func show(_ destination: SettingsDestination = .lastPage) {
         guard let window else { return }
+        if destination != .lastPage, let index = tabs.tabViewItems.firstIndex(where: { $0.label == L.tabCalendars }) {
+            tabs.selectedTabViewItemIndex = index
+        }
+        if destination == .newCalendarSet {
+            SettingsRoute.shared.wantsNewSet = true
+        }
         if !window.isVisible { window.center() }
         opening = true
         window.presentInFront()
@@ -278,94 +286,6 @@ private struct MenuBarPane: View {
             }
         }
         .formStyle(.grouped)
-    }
-}
-
-private struct CalendarsPane: View {
-    @Environment(Preferences.self) private var prefs
-    @Environment(CalendarStore.self) private var store
-    @State private var pendingDeletion: CalendarSet?
-
-    var body: some View {
-        @Bindable var prefs = prefs
-        Form {
-            Section {
-                Picker(
-                    L.defaultCalendar,
-                    selection: Binding(
-                        get: { prefs.defaultCalendarID ?? store.defaultCalendar?.calendarIdentifier ?? "" },
-                        set: { prefs.defaultCalendarID = $0 }
-                    )
-                ) {
-                    ForEach(store.writableCalendars, id: \.calendarIdentifier) { calendar in
-                        Text(calendar.title).tag(calendar.calendarIdentifier)
-                    }
-                }
-                Toggle(L.showDeclined, isOn: $prefs.showDeclined)
-                    .onChange(of: prefs.showDeclined) { store.reload() }
-                Toggle(L.showReminders, isOn: $prefs.showReminders)
-                    .onChange(of: prefs.showReminders) { store.reload() }
-            }
-            Section {
-                ForEach($prefs.calendarSets) { $set in
-                    DisclosureGroup {
-                        ForEach(store.eventCalendars, id: \.calendarIdentifier) { calendar in
-                            Toggle(
-                                isOn: Binding(
-                                    get: { set.calendarIDs.contains(calendar.calendarIdentifier) },
-                                    set: { on in
-                                        if on {
-                                            set.calendarIDs.insert(calendar.calendarIdentifier)
-                                        } else {
-                                            set.calendarIDs.remove(calendar.calendarIdentifier)
-                                        }
-                                        store.reload()
-                                    }
-                                )
-                            ) {
-                                Label {
-                                    Text(calendar.title)
-                                } icon: {
-                                    Image(systemName: "circle.fill")
-                                        .foregroundStyle(Color(cgColor: calendar.cgColor))
-                                }
-                            }
-                        }
-                        Button(L.deleteSet, role: .destructive) {
-                            pendingDeletion = set
-                        }
-                    } label: {
-                        TextField(L.calendarSets, text: $set.name, prompt: Text(L.setNamePlaceholder))
-                            .textFieldStyle(.plain)
-                    }
-                }
-                Button(L.newSet) {
-                    let visible = Set(store.visibleCalendars.map(\.calendarIdentifier))
-                    prefs.calendarSets.append(CalendarSet(name: "", calendarIDs: visible))
-                }
-            } header: {
-                Text(L.calendarSets)
-            } footer: {
-                Text(L.calendarSetsFooter)
-                    .foregroundStyle(.secondary)
-            }
-        }
-        .formStyle(.grouped)
-        .confirmationDialog(
-            pendingDeletion.map { $0.name.isEmpty ? L.deleteSetUntitledTitle : L.deleteSetTitle($0.name) } ?? "",
-            isPresented: Binding(get: { pendingDeletion != nil }, set: { if !$0 { pendingDeletion = nil } }),
-            titleVisibility: .visible,
-            presenting: pendingDeletion
-        ) { set in
-            Button(L.deleteSet, role: .destructive) {
-                if prefs.activeSetID == set.id { prefs.activeSetID = nil }
-                prefs.calendarSets.removeAll { $0.id == set.id }
-                store.reload()
-            }
-            Button(L.cancel, role: .cancel) {}
-        } message: { _ in
-            Text(L.deleteSetMessage)
-        }
     }
 }
 
