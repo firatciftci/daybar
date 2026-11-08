@@ -308,15 +308,40 @@ struct ConfettiPiece {
 }
 
 extension View {
-    func inputCapsule(in namespace: Namespace.ID) -> some View {
-        padding(.horizontal, 12)
-            .frame(height: 34)
-            .glassEffect(.regular.interactive(), in: .capsule)
-            .glassEffectID("input", in: namespace)
+    func inputCapsule(in namespace: Namespace.ID, focused: Bool, focus: @escaping () -> Void) -> some View {
+        modifier(InputCapsule(namespace: namespace, focused: focused, focus: focus))
     }
 
     func onHorizontalSwipe(_ action: @escaping (Int) -> Void) -> some View {
         background(SwipeCatcher(action: action))
+    }
+}
+
+private struct InputCapsule: ViewModifier {
+    let namespace: Namespace.ID
+    let focused: Bool
+    let focus: () -> Void
+    @Environment(\.appearsActive) private var appearsActive
+
+    func body(content: Content) -> some View {
+        content
+            .padding(.horizontal, 12)
+            .frame(height: 34)
+            .background {
+                Color.clear
+                    .contentShape(.capsule)
+                    .onTapGesture(perform: focus)
+            }
+            .glassEffect(.regular, in: .capsule)
+            .glassEffectID("input", in: namespace)
+            .overlay {
+                Capsule()
+                    .inset(by: -1.5)
+                    .stroke(Color(nsColor: .keyboardFocusIndicatorColor), lineWidth: 3)
+                    .animation(Motion.fade) { $0.opacity(focused && appearsActive ? 1 : 0) }
+                    .allowsHitTesting(false)
+                    .accessibilityHidden(true)
+            }
     }
 }
 

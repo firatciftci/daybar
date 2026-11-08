@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct SearchField: View {
+    let glass: Namespace.ID
     @Environment(PanelModel.self) private var model
     @FocusState private var focused: Bool
 
@@ -10,7 +11,7 @@ struct SearchField: View {
             Image(systemName: "magnifyingglass")
                 .accessibilityHidden(true)
                 .font(.system(size: 12.5, weight: .semibold))
-                .foregroundStyle(focused ? AnyShapeStyle(.primary) : AnyShapeStyle(.secondary))
+                .foregroundStyle(.secondary)
                 .frame(width: 16)
             TextField(L.searchPlaceholder, text: $model.searchQuery)
                 .textFieldStyle(.plain)
@@ -36,6 +37,7 @@ struct SearchField: View {
                 .transition(.opacity)
             }
         }
+        .inputCapsule(in: glass, focused: focused) { focused = true }
         .animation(Motion.fade, value: model.searchQuery.isEmpty)
         .task {
             try? await Task.sleep(for: .milliseconds(30))

@@ -255,23 +255,32 @@ struct LowerPane<Content: View>: View {
 
 private struct InputSlot: View {
     let input: InputMode
+    @Environment(PanelModel.self) private var model
+    @Environment(CalendarStore.self) private var store
     @Namespace private var glass
 
     var body: some View {
-        GlassEffectContainer(spacing: 6) {
-            VStack(spacing: 6) {
+        let entry =
+            input == .quickAdd
+            ? EntryParser.parse(model.quickAddText, calendars: store.eventCalendars, reminderLists: store.reminderCalendars, now: model.now)
+            : nil
+        VStack(spacing: 6) {
+            GlassEffectContainer {
                 switch input {
                 case .quickAdd:
-                    QuickAddBar(glass: glass)
+                    if let entry { QuickAddBar(glass: glass, entry: entry) }
                 case .search:
-                    SearchField()
-                        .inputCapsule(in: glass)
+                    SearchField(glass: glass)
                 case .event:
-                    EventTitleField()
-                        .inputCapsule(in: glass)
+                    EventTitleField(glass: glass)
                 }
             }
+            if let entry, !entry.isEmpty {
+                ParsePreview(entry: entry, store: store)
+                    .glassEffect(.regular, in: .rect(cornerRadius: 16))
+            }
         }
+        .animation(.smooth(duration: 0.25), value: entry?.isEmpty)
     }
 }
 

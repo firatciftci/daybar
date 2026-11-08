@@ -2,6 +2,7 @@ import EventKit
 import SwiftUI
 
 struct EventTitleField: View {
+    let glass: Namespace.ID
     @Environment(PanelModel.self) private var model
     @Environment(CalendarStore.self) private var store
     @FocusState private var focus: EditorField?
@@ -23,6 +24,7 @@ struct EventTitleField: View {
                 .focused($focus, equals: .title)
                 .onSubmit { model.requestSave() }
         }
+        .inputCapsule(in: glass, focused: focus == .title) { focus = .title }
         .modifier(EditorFocusSync(focus: $focus, owned: [.title]))
     }
 }

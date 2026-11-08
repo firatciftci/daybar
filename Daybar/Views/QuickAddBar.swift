@@ -3,73 +3,62 @@ import SwiftUI
 
 struct QuickAddBar: View {
     let glass: Namespace.ID
+    let entry: ParsedEntry
     @Environment(PanelModel.self) private var model
     @Environment(CalendarStore.self) private var store
     @FocusState private var focused: Bool
     @State private var confirmation: String?
 
-    private var parsed: ParsedEntry {
-        EntryParser.parse(model.quickAddText, calendars: store.eventCalendars, reminderLists: store.reminderCalendars, now: model.now)
-    }
-
     var body: some View {
         @Bindable var model = model
-        let entry = parsed
-        Group {
-            HStack(spacing: 8) {
-                Button {
-                    NSApp.currentEvent?.window?.makeKey()
-                    focused = true
-                } label: {
-                    Image(systemName: entry.kind == .reminder ? "checklist" : "calendar.badge.plus")
-                        .font(.system(size: 12.5, weight: .semibold))
-                        .foregroundStyle(focused ? AnyShapeStyle(.primary) : AnyShapeStyle(.tertiary))
-                        .contentTransition(.symbolEffect(.replace))
-                        .frame(width: 16)
-                        .contentShape(.rect)
-                }
-                .buttonStyle(.plain)
-                .help(L.quickAddHelp)
-                .accessibilityLabel(L.quickAddIconHelp)
-                TextField(L.quickAddPlaceholder, text: $model.quickAddText)
-                    .textFieldStyle(.plain)
-                    .font(.system(size: 13))
-                    .focused($focused)
-                    .background {
-                        TokenHighlighter(
-                            text: model.quickAddText,
-                            spans: entry.spans,
-                            calendarColor: (entry.calendar ?? entry.reminderList).flatMap { NSColor(cgColor: $0.cgColor) },
-                            active: focused
-                        )
-                    }
-                    .onSubmit(commit)
-                    .onChange(of: focused) { _, isFocused in
-                        if isFocused, model.quickAddText.isEmpty, !isUserInitiated { focused = false }
-                    }
-                if let confirmation {
-                    Label(confirmation, systemImage: "checkmark.circle.fill")
-                        .labelStyle(.titleAndIcon)
-                        .font(.system(size: 11.5, weight: .semibold))
-                        .foregroundStyle(.green)
-                        .transition(.opacity)
-                } else if !model.quickAddText.isEmpty {
-                    Text(L.quickAddHint)
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundStyle(.tertiary)
-                        .transition(.opacity)
-                }
+        HStack(spacing: 8) {
+            Button(action: focusField) {
+                Image(systemName: entry.kind == .reminder ? "checklist" : "calendar.badge.plus")
+                    .font(.system(size: 12.5, weight: .semibold))
+                    .foregroundStyle(.secondary)
+                    .contentTransition(.symbolEffect(.replace))
+                    .frame(width: 16)
+                    .contentShape(.rect)
             }
-            .inputCapsule(in: glass)
-
-            if !entry.isEmpty, focused || !model.quickAddText.isEmpty {
-                ParsePreview(entry: entry, store: store)
-                    .glassEffect(.regular, in: .rect(cornerRadius: 16))
-                    .glassEffectID("preview", in: glass)
+            .buttonStyle(.plain)
+            .help(L.quickAddHelp)
+            .accessibilityLabel(L.quickAddIconHelp)
+            TextField(L.quickAddPlaceholder, text: $model.quickAddText)
+                .textFieldStyle(.plain)
+                .font(.system(size: 13))
+                .focused($focused)
+                .background {
+                    TokenHighlighter(
+                        text: model.quickAddText,
+                        spans: entry.spans,
+                        calendarColor: (entry.calendar ?? entry.reminderList).flatMap { NSColor(cgColor: $0.cgColor) },
+                        active: focused
+                    )
+                }
+                .onSubmit(commit)
+                .onChange(of: focused) { _, isFocused in
+                    if isFocused, model.quickAddText.isEmpty, !isUserInitiated { focused = false }
+                }
+            if let confirmation {
+                Label(confirmation, systemImage: "checkmark.circle.fill")
+                    .labelStyle(.titleAndIcon)
+                    .font(.system(size: 11.5, weight: .semibold))
+                    .foregroundStyle(.green)
+                    .transition(.opacity)
+            } else if !model.quickAddText.isEmpty {
+                Text(L.quickAddHint)
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(.tertiary)
+                    .transition(.opacity)
             }
         }
-        .animation(.smooth(duration: 0.25), value: entry.isEmpty)
         .animation(Motion.fade, value: confirmation)
+        .inputCapsule(in: glass, focused: focused, focus: focusField)
+    }
+
+    private func focusField() {
+        NSApp.currentEvent?.window?.makeKey()
+        focused = true
     }
 
     private var isUserInitiated: Bool {
@@ -85,7 +74,6 @@ struct QuickAddBar: View {
     }
 
     private func commit() {
-        let entry = parsed
         guard !entry.isEmpty else { return }
         if store.add(entry) {
             confirmation = entry.kind == .reminder ? L.reminderSaved : L.eventSaved
@@ -146,7 +134,7 @@ private struct TokenHighlighter: NSViewRepresentable {
     }
 }
 
-private struct ParsePreview: View {
+struct ParsePreview: View {
     let entry: ParsedEntry
     let store: CalendarStore
 
