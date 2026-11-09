@@ -40,6 +40,9 @@ jobs:
       - name: Format, lint, build, and analyze
         run: tools/check.sh
 
+      - name: Build the disk image
+        run: tools/dmg/make-dmg.sh build/check/Build/Products/Debug/Daybar.app build/Daybar.dmg
+
       - name: Check formatting
         run: |
           if ! git diff --exit-code; then

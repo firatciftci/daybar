@@ -44,3 +44,10 @@ The script formats the code in place, so commit any changes it makes.
 ## Releases
 
 Maintainers cut a release by raising `MARKETING_VERSION` in `project.yml`, merging that change, and pushing a matching `v` tag, such as `v1.2.0`. The release workflow builds, signs, and notarizes the app, publishes the DMG, and updates the Sparkle feed that installed copies check for updates.
+
+The script `tools/dmg/make-dmg.sh` builds the disk image. It lays out the installer window with a background, the app, and a shortcut to Applications. To change the design, edit the colors, caption, or layout in `tools/dmg/dmg.json`, render a new background, and commit it:
+
+```sh
+xcrun swift tools/dmg/background.swift tools/dmg
+tools/dmg/make-dmg.sh path/to/Daybar.app build/Daybar.dmg
+```

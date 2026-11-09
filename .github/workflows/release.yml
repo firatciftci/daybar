@@ -126,10 +126,7 @@ jobs:
           NOTARY_KEY_ID: ${{ secrets.NOTARY_KEY_ID }}
           NOTARY_ISSUER_ID: ${{ secrets.NOTARY_ISSUER_ID }}
         run: |
-          mkdir -p "$DIST" "$RUNNER_TEMP/stage"
-          ditto "$ARCHIVE/Products/Applications/Daybar.app" "$RUNNER_TEMP/stage/Daybar.app"
-          ln -s /Applications "$RUNNER_TEMP/stage/Applications"
-          diskutil image create from --format ULFO --volumeName Daybar "$RUNNER_TEMP/stage" "$DIST/Daybar.dmg"
+          tools/dmg/make-dmg.sh "$ARCHIVE/Products/Applications/Daybar.app" "$DIST/Daybar.dmg"
           codesign --timestamp --keychain "$KEYCHAIN" --sign "$IDENTITY" "$DIST/Daybar.dmg"
           xcrun notarytool submit "$DIST/Daybar.dmg" --key "$RUNNER_TEMP/notary.p8" --key-id "$NOTARY_KEY_ID" --issuer "$NOTARY_ISSUER_ID" --wait --timeout 30m
           xcrun stapler staple "$DIST/Daybar.dmg"

@@ -1,0 +1,13 @@
+{
+  "caption": "Drag Daybar to Applications to install",
+  "accent": "#2E6EFA",
+  "glow": "#8FB4FF",
+  "arrow": "arc",
+  "motif": null,
+  "width": 660,
+  "height": 400,
+  "iconSize": 128,
+  "app": [180, 160],
+  "applications": [480, 160],
+  "captionY": 296
+}
