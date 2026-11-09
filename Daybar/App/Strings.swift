@@ -145,7 +145,20 @@ enum L {
     static let updatesTitle = "Updates"
     static let checkForUpdates = "Check now"
     static let automaticUpdates = "Check for updates automatically"
-    static func updatesVersion(_ version: String) -> String { "Version \(version)" }
+    static func lastChecked(_ time: String) -> String { "Last checked \(time)" }
+    static let neverChecked = "Not checked yet"
+    static let tabAbout = "About"
+    static let aboutTagline = "Your calendar in the menu bar, one click away."
+    static func aboutVersion(_ version: String, _ build: String) -> String { "Version \(version) (\(build))" }
+    static let developer = "Developer"
+    static let sourceCode = "Source code"
+    static let github = "GitHub"
+    static let releaseNotes = "Release notes"
+    static let reportProblem = "Report a problem"
+    static let license = "License"
+    static let licenseName = "MIT"
+    static let acknowledgments = "Acknowledgments"
+    static let openSourceFooter = "Daybar is free and open source software."
     static let defaultView = "Open to"
     static let weekStart = "Week starts on"
     static let systemSetting = "System setting"

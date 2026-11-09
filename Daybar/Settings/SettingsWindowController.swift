@@ -45,6 +45,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         add(L.tabWeather, symbol: "cloud.sun", WeatherPane())
         add(L.tabPermissions, symbol: "hand.raised", PermissionsPane())
         add(L.tabAdvanced, symbol: "gearshape.2", AdvancedPane())
+        add(L.tabAbout, symbol: "info.circle", AboutPane())
         let window = NSWindow(contentViewController: tabs)
         window.styleMask = [.titled, .closable, .miniaturizable]
         window.toolbarStyle = .preference
@@ -161,7 +162,6 @@ private struct AdvancedPane: View {
 private struct GeneralPane: View {
     @Environment(Preferences.self) private var prefs
     @Environment(CalendarStore.self) private var store
-    @Environment(Updater.self) private var updater
     @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
 
     var body: some View {
@@ -207,24 +207,8 @@ private struct GeneralPane: View {
                 Toggle(L.weekNumbers, isOn: $prefs.showWeekNumbers)
                 TimeZonePicker(selection: $prefs.secondTimeZoneID)
             }
-            if updater.isAvailable {
-                Section {
-                    @Bindable var updater = updater
-                    LabeledContent {
-                        Button(L.checkForUpdates) { updater.checkForUpdates(nil) }
-                    } label: {
-                        Text(L.updatesTitle)
-                        Text(L.updatesVersion(Self.version))
-                    }
-                    Toggle(L.automaticUpdates, isOn: $updater.automaticallyChecks)
-                }
-            }
         }
         .formStyle(.grouped)
-    }
-
-    private static var version: String {
-        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? ""
     }
 }
 

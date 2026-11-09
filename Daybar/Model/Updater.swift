@@ -18,7 +18,11 @@ final class Updater: NSObject, SPUStandardUserDriverDelegate {
         }
     }
 
+    private(set) var canCheck = false
+    private(set) var lastCheck: Date?
+
     @ObservationIgnored private var controller: SPUStandardUpdaterController?
+    @ObservationIgnored private var observation: NSKeyValueObservation?
 
     var isAvailable: Bool { controller != nil }
 
@@ -26,7 +30,16 @@ final class Updater: NSObject, SPUStandardUserDriverDelegate {
         super.init()
         let key = Bundle.main.object(forInfoDictionaryKey: "SUPublicEDKey") as? String ?? ""
         guard !key.isEmpty else { return }
-        controller = SPUStandardUpdaterController(startingUpdater: true, updaterDelegate: nil, userDriverDelegate: self)
+        let controller = SPUStandardUpdaterController(startingUpdater: true, updaterDelegate: nil, userDriverDelegate: self)
+        self.controller = controller
+        observation = controller.updater.observe(\.canCheckForUpdates, options: [.initial]) { [weak self] _, _ in
+            Task { @MainActor in self?.refresh() }
+        }
+    }
+
+    func refresh() {
+        canCheck = controller?.updater.canCheckForUpdates ?? false
+        lastCheck = controller?.updater.lastUpdateCheckDate
     }
 
     @objc func checkForUpdates(_ sender: Any?) {
