@@ -43,4 +43,4 @@ The script formats the code in place, so commit any changes it makes.
 
 ## Releases
 
-Maintainers cut a release by raising `MARKETING_VERSION` in `project.yml`, merging that change, and pushing a matching `v` tag, like `v1.2.0`. The release workflow builds, signs, notarizes, and publishes the DMG.
+Maintainers cut a release by raising `MARKETING_VERSION` in `project.yml`, merging that change, and pushing a matching `v` tag, such as `v1.2.0`. The release workflow builds, signs, and notarizes the app, publishes the DMG, and updates the Sparkle feed that installed copies check for updates.

@@ -515,6 +515,9 @@ private struct MoreMenu: View {
             Toggle(L.compactLayout, systemImage: "rectangle.compress.vertical", isOn: $prefs.compact)
             Divider()
             Button(L.settingsMenu, systemImage: "gearshape") { model.onOpenSettings?(.lastPage) }
+            if Updater.shared.isAvailable {
+                Button(L.checkForUpdatesMenu, systemImage: "arrow.down.circle") { Updater.shared.checkForUpdates(nil) }
+            }
             Button(L.quit, systemImage: "power") { NSApp.terminate(nil) }
         } label: {
             GlassMenuLabel(symbol: "ellipsis")

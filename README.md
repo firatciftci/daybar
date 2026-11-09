@@ -125,7 +125,7 @@ Daybar needs macOS 27 or later.
 2. Open it and drag Daybar to your Applications folder.
 3. Open Daybar and allow access to your calendars when macOS asks.
 
-Every release is signed with a Developer ID, notarized by Apple, and has a build attestation you can check:
+Daybar updates itself. Each release is signed with a Developer ID, notarized by Apple, and has a build attestation you can check:
 
 ```sh
 gh attestation verify Daybar.dmg --repo firatciftci/daybar
@@ -150,7 +150,7 @@ gh attestation verify Daybar.dmg --repo firatciftci/daybar
 
 ## Privacy
 
-Daybar has no accounts, analytics, or servers of its own. Your events, reminders, and contacts stay on your Mac and are read through Apple's frameworks. The only network requests are for weather: Daybar sends your approximate location, or the city you chose, to Apple Weather, and to [Open-Meteo](https://open-meteo.com) if Apple Weather is unavailable. Turn off weather in Settings and Daybar makes no network requests at all.
+Daybar has no accounts, analytics, or servers of its own. Your events, reminders, and contacts stay on your Mac and are read through Apple's frameworks. Weather requests send your approximate location, or the city you chose, to Apple Weather. If Apple Weather is unavailable, they go to [Open-Meteo](https://open-meteo.com) instead. Update checks go to GitHub. If you turn off weather and automatic update checks in Settings, Daybar only goes online when you check for updates yourself.
 
 ## Build from source
 

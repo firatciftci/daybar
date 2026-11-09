@@ -8,6 +8,9 @@ packages:
   KeyboardShortcuts:
     url: https://github.com/sindresorhus/KeyboardShortcuts
     exactVersion: "3.1.0"
+  Sparkle:
+    url: https://github.com/sparkle-project/Sparkle
+    exactVersion: "2.10.1"
 settings:
   base:
     SWIFT_VERSION: "6.0"
@@ -25,6 +28,7 @@ settings:
     ENABLE_HARDENED_RUNTIME: YES
     MARKETING_VERSION: "1.1.1"
     CURRENT_PROJECT_VERSION: "4"
+    SPARKLE_PUBLIC_KEY: "Lb4T5oPTLQxltqjeib65BEyjypu/A7mTiiDw3YKOMF4="
 targets:
   Daybar:
     type: application
@@ -39,6 +43,7 @@ targets:
         buildPhase: resources
     dependencies:
       - package: KeyboardShortcuts
+      - package: Sparkle
     entitlements:
       path: Daybar/Daybar.entitlements
       properties:
@@ -48,6 +53,9 @@ targets:
         com.apple.security.personal-information.location: true
         com.apple.security.personal-information.addressbook: true
         com.apple.developer.weatherkit: true
+        com.apple.security.temporary-exception.mach-lookup.global-name:
+          - com.firatciftci.Daybar-spks
+          - com.firatciftci.Daybar-spki
     info:
       path: Daybar/Info.plist
       properties:
@@ -62,6 +70,9 @@ targets:
         NSLocationUsageDescription: Daybar uses your location to show the local weather forecast.
         NSLocationWhenInUseUsageDescription: Daybar uses your location to show the local weather forecast.
         NSHumanReadableCopyright: "© 2026 Firat Ciftci"
+        SUFeedURL: https://github.com/firatciftci/daybar/releases/latest/download/appcast.xml
+        SUPublicEDKey: $(SPARKLE_PUBLIC_KEY)
+        SUEnableInstallerLauncherService: true
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.firatciftci.Daybar

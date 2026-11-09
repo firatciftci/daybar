@@ -22,6 +22,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             menuBar?.togglePanel()
         }
         WeatherModel.shared.refresh()
+        _ = Updater.shared
         if !DemoData.isEnabled { IntentSupport.start() }
         Timer.scheduledTimer(withTimeInterval: 1_800, repeats: true) { _ in
             MainActor.assumeIsolated { WeatherModel.shared.refresh() }
@@ -46,6 +47,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let appItem = NSMenuItem()
         let appMenu = NSMenu()
         appMenu.addItem(withTitle: L.settingsMenu, action: #selector(Self.openSettings), keyEquivalent: ",")
+        if Updater.shared.isAvailable {
+            appMenu.addItem(withTitle: L.checkForUpdatesMenu, action: #selector(Updater.checkForUpdates(_:)), keyEquivalent: "").target =
+                Updater.shared
+        }
         appMenu.addItem(.separator())
         appMenu.addItem(withTitle: L.quit, action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         appItem.submenu = appMenu

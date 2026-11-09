@@ -24,6 +24,7 @@ jobs:
       attestations: write
     env:
       TAG: ${{ github.ref_name }}
+      REPO: ${{ github.repository }}
       TEAM_ID: 55PN4MC8Q6
       BUNDLE_ID: com.firatciftci.Daybar
       IDENTITY: Developer ID Application
@@ -34,6 +35,7 @@ jobs:
             echo "KEYCHAIN=$RUNNER_TEMP/signing.keychain-db"
             echo "ARCHIVE=$RUNNER_TEMP/Daybar.xcarchive"
             echo "DIST=$RUNNER_TEMP/dist"
+            echo "UPDATES=$RUNNER_TEMP/updates"
           } >> "$GITHUB_ENV"
 
       - name: Checkout
@@ -52,6 +54,7 @@ jobs:
             echo "::error::$TAG doesn't match MARKETING_VERSION $version in project.yml."
             exit 1
           fi
+          echo "VERSION=$version" >> "$GITHUB_ENV"
 
       - name: Format, lint, build, and analyze
         run: tools/check.sh
@@ -64,6 +67,7 @@ jobs:
             -configuration Release \
             -destination generic/platform=macOS \
             -archivePath "$ARCHIVE" \
+            -clonedSourcePackagesDirPath build/check/SourcePackages \
             CURRENT_PROJECT_VERSION="$(git rev-list --count HEAD)" \
             CODE_SIGNING_ALLOWED=NO
 
@@ -96,9 +100,12 @@ jobs:
             "$entitlements"
           cp "$RUNNER_TEMP/embedded.provisionprofile" "$app/Contents/embedded.provisionprofile"
           sign() { codesign --force --timestamp --options runtime --keychain "$KEYCHAIN" --sign "$IDENTITY" "$@"; }
-          if [ -d "$app/Contents/Frameworks" ]; then
-            find "$app/Contents/Frameworks" -depth \( -name "*.framework" -o -name "*.dylib" \) -print0 | while IFS= read -r -d '' item; do sign "$item"; done
-          fi
+          sparkle="$app/Contents/Frameworks/Sparkle.framework"
+          sign "$sparkle/Versions/B/XPCServices/Installer.xpc"
+          sign --preserve-metadata=entitlements "$sparkle/Versions/B/XPCServices/Downloader.xpc"
+          sign "$sparkle/Versions/B/Autoupdate"
+          sign "$sparkle/Versions/B/Updater.app"
+          sign "$sparkle"
           sign --entitlements "$entitlements" "$app"
           codesign --verify --strict --deep --verbose=2 "$app"
 
@@ -130,10 +137,30 @@ jobs:
           ditto -c -k --keepParent "$ARCHIVE/dSYMs/Daybar.app.dSYM" "$DIST/Daybar.app.dSYM.zip"
           (cd "$DIST" && shasum -a 256 Daybar.dmg > Daybar.dmg.sha256)
 
+      - name: Build the update feed
+        env:
+          SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p "$UPDATES"
+          ditto -c -k --sequesterRsrc --keepParent "$ARCHIVE/Products/Applications/Daybar.app" "$UPDATES/Daybar-$VERSION.zip"
+          if [ -f ".github/releases/$TAG.md" ]; then cp ".github/releases/$TAG.md" "$UPDATES/Daybar-$VERSION.md"; fi
+          gh release download --repo "$REPO" --pattern appcast.xml --dir "$UPDATES" 2>/dev/null || true
+          build/check/SourcePackages/artifacts/sparkle/Sparkle/bin/generate_appcast \
+            --ed-key-file - \
+            --download-url-prefix "https://github.com/$REPO/releases/download/$TAG/" \
+            --embed-release-notes \
+            --link "https://github.com/$REPO" \
+            --maximum-deltas 0 \
+            "$UPDATES" <<< "$SPARKLE_PRIVATE_KEY"
+          cp "$UPDATES/Daybar-$VERSION.zip" "$UPDATES/appcast.xml" "$DIST/"
+
       - name: Attest the build
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
-          subject-path: ${{ runner.temp }}/dist/Daybar.dmg
+          subject-path: |
+            ${{ runner.temp }}/dist/Daybar.dmg
+            ${{ runner.temp }}/dist/Daybar-*.zip
 
       - name: Publish the release
         env:
@@ -142,11 +169,11 @@ jobs:
         run: |
           notes=".github/releases/$TAG.md"
           if [ -f "$notes" ]; then
-            gh release create "$TAG" --title "Daybar ${TAG#v}" --notes-file "$notes" --verify-tag
+            gh release create "$TAG" --title "Daybar $VERSION" --notes-file "$notes" --verify-tag
           else
             npx --yes changelogithub@15.0.5 || gh release create "$TAG" --title "$TAG" --generate-notes --verify-tag
           fi
-          gh release upload "$TAG" "$DIST/Daybar.dmg" "$DIST/Daybar.dmg.sha256" "$DIST/Daybar.app.dSYM.zip" --clobber
+          gh release upload "$TAG" "$DIST/Daybar.dmg" "$DIST/Daybar.dmg.sha256" "$DIST/Daybar-$VERSION.zip" "$DIST/appcast.xml" "$DIST/Daybar.app.dSYM.zip" --clobber
 
       - name: Clean up
         if: always()

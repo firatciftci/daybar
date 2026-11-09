@@ -29,6 +29,7 @@ enum L {
     static let openCalendar = "Open Calendar"
     static let settingsMenu = "Settings…"
     static let quit = "Quit Daybar"
+    static let checkForUpdatesMenu = "Check for updates…"
     static let about = "About Daybar"
     static let openWeather = "Open Weather"
     static func weatherHighLow(_ high: String, _ low: String) -> String { "H:\(high)  L:\(low)" }
@@ -141,6 +142,10 @@ enum L {
     static let tabWeather = "Weather"
     static let launchAtLogin = "Open at login"
     static let shortcut = "Show Daybar"
+    static let updatesTitle = "Updates"
+    static let checkForUpdates = "Check now"
+    static let automaticUpdates = "Check for updates automatically"
+    static func updatesVersion(_ version: String) -> String { "Version \(version)" }
     static let defaultView = "Open to"
     static let weekStart = "Week starts on"
     static let systemSetting = "System setting"

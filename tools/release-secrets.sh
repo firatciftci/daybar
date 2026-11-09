@@ -189,6 +189,8 @@ ENVIRONMENT="release"
 TEAM_ID="55PN4MC8Q6"
 BUNDLE_ID="com.firatciftci.Daybar"
 IDENTITY="Developer ID Application: Firat Ciftci ($TEAM_ID)"
+SPARKLE_BIN="$(cd "$(dirname "$0")/.." && pwd)/build/check/SourcePackages/artifacts/sparkle/Sparkle/bin"
+SPARKLE_ACCOUNT="daybar"
 P12="$HOME/Desktop/DaybarDeveloperID.p12"
 WORK=$(mktemp -d)
 trap 'rm -rf "$WORK"; rm -f "$P12"' EXIT
@@ -246,7 +248,7 @@ profile_matches_cert() {
   return 1
 }
 
-TOTAL_STAGES=5
+TOTAL_STAGES=6
 
 banner "Daybar release secrets"
 
@@ -366,10 +368,37 @@ if [[ "$NOTARY_KEY_PATH" != "$keep/"* ]] && confirm "Move the .p8 key to ${keep/
 fi
 pause
 
+stage "Sparkle update key"
+say "Daybar checks each update against the public key in project.yml."
+say "The release workflow signs updates with the matching private key from your login keychain."
+until [[ -x "$SPARKLE_BIN/generate_keys" ]]; do
+  warn "Sparkle's tools aren't downloaded yet."
+  step "In another terminal, run: tools/check.sh"
+  pause "Press Enter once it finishes"
+done
+expected=$(sed -nE 's/^ *SPARKLE_PUBLIC_KEY: "?([^"]+)"?$/\1/p' "$(dirname "$0")/../project.yml")
+actual=$("$SPARKLE_BIN/generate_keys" --account "$SPARKLE_ACCOUNT" -p 2>/dev/null || true)
+if [[ -z "$actual" ]]; then
+  fail "There's no Sparkle key named $SPARKLE_ACCOUNT in your login keychain."
+  exit 1
+fi
+if [[ "$actual" != "$expected" ]]; then
+  fail "The key in your keychain doesn't match SPARKLE_PUBLIC_KEY in project.yml."
+  exit 1
+fi
+ok "The keychain key matches project.yml."
+note "macOS may ask to let generate_keys read the key. Click Allow."
+"$SPARKLE_BIN/generate_keys" --account "$SPARKLE_ACCOUNT" -x "$WORK/sparkle.key" >/dev/null
+set_env_secret SPARKLE_PRIVATE_KEY < "$WORK/sparkle.key"
+rm -f "$WORK/sparkle.key"
+warn "Keep a backup of this key. Without it, installed copies of Daybar can't accept new updates."
+note "Export one with: $SPARKLE_BIN/generate_keys --account $SPARKLE_ACCOUNT -x <file>"
+pause
+
 stage "Check"
 names=$(gh secret list --env "$ENVIRONMENT" --repo "$REPO" --json name --jq '.[].name' 2>/dev/null || true)
 missing=()
-for name in DEVELOPER_ID_CERTIFICATE DEVELOPER_ID_CERTIFICATE_PASSWORD DEVELOPER_ID_PROFILE NOTARY_KEY NOTARY_KEY_ID NOTARY_ISSUER_ID; do
+for name in DEVELOPER_ID_CERTIFICATE DEVELOPER_ID_CERTIFICATE_PASSWORD DEVELOPER_ID_PROFILE NOTARY_KEY NOTARY_KEY_ID NOTARY_ISSUER_ID SPARKLE_PRIVATE_KEY; do
   if [[ $'\n'"$names"$'\n' == *$'\n'"$name"$'\n'* ]]; then ok "$name"; else fail "$name is missing"; missing+=("$name"); fi
 done
 if (( ${#missing[@]} )); then

@@ -29,6 +29,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
                     .environment(WeatherModel.shared)
                     .environment(Permissions.shared)
                     .environment(SettingsRoute.shared)
+                    .environment(Updater.shared)
                     .frame(width: 500)
                     .fixedSize(horizontal: false, vertical: true))
             host.sizingOptions = .preferredContentSize
@@ -160,6 +161,7 @@ private struct AdvancedPane: View {
 private struct GeneralPane: View {
     @Environment(Preferences.self) private var prefs
     @Environment(CalendarStore.self) private var store
+    @Environment(Updater.self) private var updater
     @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
 
     var body: some View {
@@ -205,8 +207,24 @@ private struct GeneralPane: View {
                 Toggle(L.weekNumbers, isOn: $prefs.showWeekNumbers)
                 TimeZonePicker(selection: $prefs.secondTimeZoneID)
             }
+            if updater.isAvailable {
+                Section {
+                    @Bindable var updater = updater
+                    LabeledContent {
+                        Button(L.checkForUpdates) { updater.checkForUpdates(nil) }
+                    } label: {
+                        Text(L.updatesTitle)
+                        Text(L.updatesVersion(Self.version))
+                    }
+                    Toggle(L.automaticUpdates, isOn: $updater.automaticallyChecks)
+                }
+            }
         }
         .formStyle(.grouped)
+    }
+
+    private static var version: String {
+        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? ""
     }
 }
 
