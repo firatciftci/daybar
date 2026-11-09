@@ -203,11 +203,12 @@ final class PanelController: NSObject, NSWindowDelegate {
         let visible = screen.visibleFrame
         let height = min(preferredHeight, visible.height - 12)
         var x = visible.midX - width / 2
-        var top = visible.maxY - 6
+        var top = visible.maxY - 1
         if let anchor, let window = anchor.window {
             let rect = window.convertToScreen(anchor.convert(anchor.bounds, to: nil))
+            let barBottom = visible.maxY < screen.frame.maxY ? visible.maxY : 2 * rect.midY - screen.frame.maxY
             x = rect.midX - width / 2
-            top = rect.minY - 6
+            top = barBottom - 1
         }
         x = min(max(x, visible.minX + 8), visible.maxX - width - 8)
         let frame = NSRect(x: x, y: top - height, width: width, height: height)
